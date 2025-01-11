@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --toastify-color-success: #12c97a !important;
+  --toastify-color-error: #f71638 !important;
+  --toastify-color-warning: #f7d216 !important;
+  --toastify-color-info: #169df7 !important;
+  --toastify-color-dark: #0c0c0d !important;
+}
+
+body {
+  @apply text-text-100 bg-background-900 min-h-[100dvh] overscroll-none;
+}
