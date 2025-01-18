@@ -44,7 +44,7 @@ const RegisterPage = () => {
   return (
     <div
       className={cn(
-        "sm:bg-background-800/20 sm:border-background-800 flex w-full flex-col gap-4 rounded-xl shadow-sm sm:m-auto sm:max-w-96 sm:border sm:p-4",
+        "sm:bg-background-900 sm:border-background-800 flex w-full flex-col gap-4 rounded-xl sm:shadow-md sm:m-auto sm:max-w-96 sm:border sm:p-4",
       )}
     >
       <h1 className={cn("py-1 text-2xl font-light")}>Register</h1>

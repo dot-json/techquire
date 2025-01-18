@@ -36,9 +36,11 @@ export default {
           500: "#7a7a85",
           600: "#62626a",
           700: "#494950",
+          750: "#3c3c3f",
           800: "#313135",
+          850: "#1d1d21",
           900: "#18181b",
-          950: "#0c0c0d",
+          950: "#0c0c0d"
         },
         primary: {
           50: "#fde8ed",
@@ -58,10 +60,12 @@ export default {
         info: "#169df7",
         warning: "#f7d216",
       },
-
       fontFamily: {
         sans: ["Figtree", "sans-serif"],
         logo: ["Outfit", "sans-serif"],
+      },
+      backgroundImage: {
+        "body-pattern": "url('/square.svg')",
       },
     },
   },

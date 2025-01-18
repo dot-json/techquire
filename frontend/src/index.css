@@ -10,6 +10,10 @@
   --toastify-color-dark: #0c0c0d !important;
 }
 
+::selection {
+  @apply bg-primary-700 text-white;
+}
+
 body {
-  @apply text-text-100 bg-background-900 min-h-[100dvh] overscroll-none;
+  @apply text-text-100 bg-body-pattern bg-left-top bg-repeat bg-background-900 min-h-[100dvh] overscroll-none;
 }

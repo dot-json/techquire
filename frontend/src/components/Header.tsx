@@ -14,7 +14,7 @@ const Header = () => {
   return (
     <header
       className={cn(
-        "border-b-background-800 sticky top-0 z-50 flex h-14 w-full items-center border-b shadow-sm backdrop-blur-lg",
+        "border-b-background-800 bg-background-900 sticky top-0 z-50 flex h-14 w-full items-center border-b shadow-sm backdrop-blur-lg",
       )}
     >
       <div className={cn("container flex items-center justify-between")}>
@@ -26,14 +26,14 @@ const Header = () => {
         >
           TechQuire
         </span>
-        <div className={cn("flex items-center gap-2")}>
+        <div className={cn("flex items-center gap-3")}>
           {id === -1 &&
             location.pathname !== "/login" &&
             location.pathname !== "/register" && (
               <>
                 <Button
                   size="sm"
-                  variant="outline"
+                  variant="link"
                   onClick={() => navigate("/login")}
                 >
                   Login
