@@ -5,19 +5,19 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-base font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center transition-all justify-center gap-2 whitespace-nowrap rounded-md text-base font-medium disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-primary-500 text-white hover:bg-primary-600",
+        default:
+          "bg-primary-500 text-white hover:bg-primary-600 active:bg-primary-700 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background-900 outline-none focus-visible:ring-2",
         destructive:
-          "bg-error text-destructive-foreground hover:bg-destructive/90",
+          "bg-error hover:bg-error/90 active:bg-error/80 focus-visible:ring-error focus-visible:ring-offset-2 focus-visible:ring-offset-background-900 outline-none focus-visible:ring-2",
         outline:
-          "border border-primary-500 bg-background-900 hover:bg-primary-500",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-100 underline underline-offset-4 hover:decoration-text-100 decoration-transparent",
+          "border border-text-100 hover:bg-text-100 hover:text-text-900 active:bg-text-200 focus-visible:ring-text-100 focus-visible:ring-offset-2 focus-visible:ring-offset-background-900 outline-none focus-visible:ring-2",
+        ghost:
+          "hover:bg-text-100 hover:text-text-900 active:bg-text-200 focus-visible:ring-text-100 focus-visible:ring-offset-2 focus-visible:ring-offset-background-900 outline-none focus-visible:ring-2",
+        link: "text-100 underline underline-offset-4 hover:decoration-text-100 decoration-transparent focus-visible:ring-text-100 focus-visible:ring-offset-2 focus-visible:ring-offset-background-900 outline-none focus-visible:ring-2",
       },
       size: {
         default: "h-9 px-4 py-2",

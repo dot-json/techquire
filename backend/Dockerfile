@@ -30,6 +30,7 @@ COPY --from=builder /app/main /app/main
 RUN chmod +x /app/main
 
 EXPOSE 8080
+EXPOSE 5432
 
 USER appuser
 

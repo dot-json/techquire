@@ -6,6 +6,7 @@ import { Navigate, useNavigate } from "react-router";
 import { useDispatch, useSelector } from "react-redux";
 import { register } from "@/lib/slices/userSlice";
 import { AppDispatch, RootState } from "@/lib/store";
+import { toast } from "react-toastify";
 
 type RegisterForm = {
   username: string;
@@ -28,6 +29,19 @@ const RegisterPage = () => {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (
+      !form.email ||
+      !form.password ||
+      !form.confirmPassword ||
+      !form.username
+    ) {
+      toast.error("Please fill all the fields");
+      return;
+    }
+    if (form.password !== form.confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
     dispatch(
       register({
         email: form.email,
@@ -35,6 +49,7 @@ const RegisterPage = () => {
         password: form.password,
       }),
     );
+    navigate("/login", { replace: true });
   };
 
   if (id !== -1) {
@@ -44,7 +59,7 @@ const RegisterPage = () => {
   return (
     <div
       className={cn(
-        "sm:bg-background-900 sm:border-background-800 flex w-full flex-col gap-4 rounded-xl sm:shadow-md sm:m-auto sm:max-w-96 sm:border sm:p-4",
+        "flex w-full flex-col gap-4 rounded-xl from-background-800 to-background-900 sm:m-auto sm:max-w-96 sm:border sm:border-background-600/75 sm:bg-gradient-to-br sm:p-4 sm:shadow-md",
       )}
     >
       <h1 className={cn("py-1 text-2xl font-light")}>Register</h1>
@@ -76,10 +91,12 @@ const RegisterPage = () => {
           value={form.confirmPassword}
         />
         <Button type="submit">Sign Up</Button>
-        <div className={cn("flex items-center gap-2 font-light")}>
+        <div className={cn("flex items-center gap-1 font-light")}>
           <p>Already have an account?</p>
           <button
-            className={cn("text-primary-500 underline")}
+            className={cn(
+              "rounded-sm px-0.5 text-primary-500 underline outline-none transition-all focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background-900",
+            )}
             type="button"
             onClick={() => navigate("/login", { replace: true })}
           >

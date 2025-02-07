@@ -6,6 +6,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { login } from "@/lib/slices/userSlice";
 import { AppDispatch, RootState } from "@/lib/store";
 import { useState } from "react";
+import { toast } from "react-toastify";
 
 type LoginForm = {
   email: string;
@@ -24,6 +25,10 @@ const LoginPage = () => {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!form.email || !form.password) {
+      toast.error("Please fill all the fields");
+      return;
+    }
     dispatch(
       login({
         email: form.email,
@@ -39,7 +44,7 @@ const LoginPage = () => {
   return (
     <div
       className={cn(
-        "sm:bg-background-900 sm:border-background-800 flex w-full flex-col gap-4 rounded-xl sm:shadow-md sm:m-auto sm:max-w-96 sm:border sm:p-4",
+        "flex w-full flex-col gap-4 rounded-xl from-background-800 to-background-900 sm:m-auto sm:max-w-96 sm:border sm:border-background-600/75 sm:bg-gradient-to-br sm:p-4 sm:shadow-md",
       )}
     >
       <h1 className={cn("py-1 text-2xl font-light")}>Login</h1>
@@ -57,10 +62,12 @@ const LoginPage = () => {
           value={form.password}
         />
         <Button type="submit">Submit</Button>
-        <div className={cn("flex items-center gap-2 font-light")}>
+        <div className={cn("flex items-center gap-1 font-light")}>
           <p>Don't have an account?</p>
           <button
-            className={cn("text-primary-500 underline")}
+            className={cn(
+              "rounded-sm px-0.5 text-primary-500 underline underline-offset-2 outline-none transition-all focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-background-900",
+            )}
             type="button"
             onClick={() => navigate("/register", { replace: true })}
           >

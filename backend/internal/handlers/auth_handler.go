@@ -73,6 +73,11 @@ func Register(c *fiber.Ctx) error {
         return c.Status(fiber.StatusBadRequest).SendString("Invalid request body")
     }
 
+    // Validate input
+    if req.Data.Email == "" || req.Data.Username == "" || req.Data.Password == "" {
+        return c.Status(fiber.StatusBadRequest).SendString("Empty field in request body")
+    }
+
     // Check if email already in use
     var existing models.User
     if err := database.DB.Where("email = ?", req.Data.Email).First(&existing).Error; err == nil {
@@ -112,5 +117,40 @@ func Register(c *fiber.Ctx) error {
         "email":    newUser.Email,
         "username": newUser.Username,
         "token":    t,
+    })
+}
+
+// CheckAuth is a middleware to check for a valid JWT
+func CheckAuth(c *fiber.Ctx) error {
+    // Get token from header
+    auth := c.Get("Authorization")
+    if auth == "" {
+        return c.Status(fiber.StatusUnauthorized).SendString("Missing Authorization header")
+    }
+
+    // Parse token
+    token := auth[7:]
+    claims := jwt.MapClaims{}
+    t, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
+        return []byte(os.Getenv("JWT_SECRET")), nil
+    })
+    if err != nil || !t.Valid {
+        return c.Status(fiber.StatusUnauthorized).SendString("Invalid token")
+    }
+
+    // Retrieve user ID from claims
+    userID := claims["user_id"]
+
+    // Fetch user from database
+    var user models.User
+    if err := database.DB.First(&user, userID).Error; err != nil {
+        return c.Status(fiber.StatusUnauthorized).SendString("User not found")
+    }
+
+    // Return user data
+    return c.JSON(fiber.Map{
+        "id":       user.ID,
+        "email":    user.Email,
+        "username": user.Username,
     })
 }

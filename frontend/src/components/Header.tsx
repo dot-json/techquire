@@ -14,13 +14,13 @@ const Header = () => {
   return (
     <header
       className={cn(
-        "border-b-background-800 bg-background-900 sticky top-0 z-50 flex h-14 w-full items-center border-b shadow-sm backdrop-blur-lg",
+        "sticky top-0 z-50 flex h-14 w-full items-center border-b border-b-background-700 bg-background-900 shadow-sm backdrop-blur-lg",
       )}
     >
       <div className={cn("container flex items-center justify-between")}>
         <span
           className={cn(
-            "font-logo relative cursor-pointer select-none text-2xl",
+            "relative cursor-pointer select-none font-logo text-2xl after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 after:bg-text-100 after:transition-all after:duration-200 hover:after:w-full",
           )}
           onClick={() => navigate("/")}
         >

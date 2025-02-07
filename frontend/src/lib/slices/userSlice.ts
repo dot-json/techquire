@@ -25,21 +25,19 @@ export const login = createAsyncThunk(
     try {
       const response = await axios.post(
         `${import.meta.env.VITE_SERVICE_URL}/auth`,
+        { data },
         {
-          data,
           headers: {
             "Content-Type": "application/json",
           },
-          responseType: "text",
+          responseType: "json",
         },
       );
       const userData = response.data;
-      console.log(userData);
       Cookie.set("user", JSON.stringify(userData), { expires: 1 });
 
       return userData;
     } catch (error: any) {
-      console.log(error.response.data);
       if (!error.response) {
         return rejectWithValue("Service is not available");
       }
@@ -55,13 +53,55 @@ export const register = createAsyncThunk(
     { rejectWithValue },
   ) => {
     try {
-      await axios.post(`${import.meta.env.VITE_SERVICE_URL}/register`, {
-        data,
-        headers: {
-          "Content-Type": "application/json",
+      await axios.post(
+        `${import.meta.env.VITE_SERVICE_URL}/register`,
+        { data },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          responseType: "text",
         },
-        responseType: "text",
-      });
+      );
+    } catch (error: any) {
+      if (!error.response) {
+        return rejectWithValue("Service is not available");
+      }
+      return rejectWithValue(error.response.data);
+    }
+  },
+);
+
+export const checkAuth = createAsyncThunk(
+  "user/checkAuth",
+  async (_, { rejectWithValue }) => {
+    try {
+      const userCookie = Cookie.get("user");
+      if (!userCookie) {
+        return {
+          id: -1,
+          email: "",
+          username: "",
+          token: "",
+        };
+      }
+      const userCookieData = JSON.parse(userCookie);
+
+      const response = await axios.post(
+        `${import.meta.env.VITE_SERVICE_URL}/check-auth`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${userCookieData.token}`,
+            "Content-Type": "application/json",
+          },
+          responseType: "json",
+        },
+      );
+      const userData = { ...response.data, token: userCookieData.token };
+      Cookie.set("user", JSON.stringify(userData), { expires: 1 });
+
+      return userData;
     } catch (error: any) {
       if (!error.response) {
         return rejectWithValue("Service is not available");
@@ -89,15 +129,32 @@ const userSlice = createSlice({
       state.email = action.payload.email;
       state.username = action.payload.username;
       state.token = action.payload.token;
+      state.error = null;
     });
     builder.addCase(login.rejected, (state, action) => {
       state.error = action.payload as string;
       toast.error(action.payload as string);
     });
-    builder.addCase(register.fulfilled, (_state, _action) => {
+    builder.addCase(register.fulfilled, (state, _action) => {
       toast.success("Successfully registered");
+      state.error = null;
     });
     builder.addCase(register.rejected, (state, action) => {
+      state.error = action.payload as string;
+      toast.error(action.payload as string);
+    });
+    builder.addCase(checkAuth.fulfilled, (state, action) => {
+      state.id = action.payload.id;
+      state.email = action.payload.email;
+      state.username = action.payload.username;
+      state.token = action.payload.token;
+      state.error = null;
+    });
+    builder.addCase(checkAuth.rejected, (state, action) => {
+      state.id = -1;
+      state.email = "";
+      state.username = "";
+      state.token = "";
       state.error = action.payload as string;
       toast.error(action.payload as string);
     });
