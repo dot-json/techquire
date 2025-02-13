@@ -20,9 +20,15 @@ const Header = () => {
       <div className={cn("container flex items-center justify-between")}>
         <span
           className={cn(
-            "relative cursor-pointer select-none font-logo text-2xl after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 after:bg-text-100 after:transition-all after:duration-200 hover:after:w-full",
+            "relative cursor-pointer select-none font-logo text-2xl after:bottom-0 after:left-0 after:h-0.5 after:w-0 after:bg-text-100 after:transition-all after:duration-200 hover:after:w-full sm:after:absolute",
           )}
-          onClick={() => navigate("/")}
+          onClick={() => {
+            if (id === -1) {
+              navigate("/");
+            } else {
+              navigate("/feed");
+            }
+          }}
         >
           TechQuire
         </span>

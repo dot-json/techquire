@@ -8,7 +8,7 @@ const MainLayout = ({ children }: { children: ReactNode }) => {
       <Header />
       <main
         className={cn(
-          "container flex min-h-[calc(100dvh-3.5rem-1px)] flex-col py-4",
+          "container flex min-h-[calc(100dvh-3.5rem-1px)] flex-col",
         )}
       >
         {children}
