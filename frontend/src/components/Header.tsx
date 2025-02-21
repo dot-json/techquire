@@ -4,12 +4,21 @@ import { Button } from "./atoms/Button";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/lib/store";
 import { logout } from "@/lib/slices/userSlice";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./atoms/DropdownMenu";
+import { CircleUserRound, LogOutIcon } from "lucide-react";
 
 const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch();
-  const { id } = useSelector((state: RootState) => state.user);
+  const { id, username } = useSelector((state: RootState) => state.user);
 
   return (
     <header
@@ -50,9 +59,32 @@ const Header = () => {
               </>
             )}
           {id !== -1 && (
-            <Button size="sm" onClick={() => dispatch(logout())}>
-              Logout
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className={cn(
+                  "rounded-full outline-none focus-visible:ring-2 focus-visible:ring-background-100 focus-visible:ring-offset-2 focus-visible:ring-offset-background-900",
+                )}
+              >
+                <CircleUserRound size={28} strokeWidth={1.75} />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="bottom" align="end" sideOffset={8}>
+                <DropdownMenuLabel>{username}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>Profile</DropdownMenuItem>
+                <DropdownMenuItem>Billing</DropdownMenuItem>
+                <DropdownMenuItem>Team</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => dispatch(logout())}
+                  className={cn(
+                    "flex w-full cursor-pointer items-center gap-2",
+                  )}
+                >
+                  <LogOutIcon size={16} />
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       </div>
