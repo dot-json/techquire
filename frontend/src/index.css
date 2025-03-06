@@ -26,6 +26,12 @@ body {
   @apply !rounded-lg border border-b-0 border-background-700 !shadow-lg;
 }
 
+pre[class*="language-"],
+code[class*="language-"] {
+  background: none !important;
+  font-size: 0.875em;
+}
+
 @layer utilities {
   .no-momentum-scroll {
     scroll-behavior: smooth;

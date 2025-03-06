@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./atoms/DropdownMenu";
-import { CircleUserRound, LogOutIcon } from "lucide-react";
+import { CircleUserRound, LogOutIcon, Pencil } from "lucide-react";
 
 const Header = () => {
   const navigate = useNavigate();
@@ -26,7 +26,7 @@ const Header = () => {
         "sticky top-0 z-50 flex h-14 w-full items-center border-b border-b-background-700 bg-background-900 shadow-sm backdrop-blur-lg",
       )}
     >
-      <div className={cn("container flex items-center justify-between")}>
+      <div className={cn("container flex h-full items-center justify-between")}>
         <span
           className={cn(
             "relative cursor-pointer select-none font-logo text-2xl after:bottom-0 after:left-0 after:h-0.5 after:w-0 after:bg-text-100 after:transition-all after:duration-200 hover:after:w-full sm:after:absolute",
@@ -41,7 +41,7 @@ const Header = () => {
         >
           TechQuire
         </span>
-        <div className={cn("flex items-center gap-3")}>
+        <div className={cn("flex items-center gap-4")}>
           {id === -1 &&
             location.pathname !== "/login" &&
             location.pathname !== "/register" && (
@@ -59,6 +59,14 @@ const Header = () => {
               </>
             )}
           {id !== -1 && (
+            <>
+              <Button size="sm">
+                <Pencil size={16} />
+                New Post
+              </Button>
+            </>
+          )}
+          {id !== -1 && (
             <DropdownMenu>
               <DropdownMenuTrigger
                 className={cn(
@@ -70,7 +78,12 @@ const Header = () => {
               <DropdownMenuContent side="bottom" align="end" sideOffset={8}>
                 <DropdownMenuLabel>{username}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>Profile</DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => navigate(`/profile/${username}`)}
+                  className={cn("cursor-pointer")}
+                >
+                  Profile
+                </DropdownMenuItem>
                 <DropdownMenuItem>Billing</DropdownMenuItem>
                 <DropdownMenuItem>Team</DropdownMenuItem>
                 <DropdownMenuSeparator />

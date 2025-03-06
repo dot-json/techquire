@@ -10,6 +10,7 @@ import { useDispatch } from "react-redux";
 import { checkAuth } from "./lib/slices/userSlice";
 import { AppDispatch } from "./lib/store";
 import Feed from "./routes/Feed";
+import Profile from "./routes/Profile";
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -28,6 +29,7 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/feed" element={<Feed />} />
+            <Route path="/profile/:handle" element={<Profile />} />
           </Routes>
         </MainLayout>
       </BrowserRouter>
