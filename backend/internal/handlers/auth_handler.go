@@ -78,10 +78,25 @@ func Register(c *fiber.Ctx) error {
         return c.Status(fiber.StatusBadRequest).SendString("Empty field in request body")
     }
 
+    // Check length of username
+    if len(req.Data.Username) < 3 || len(req.Data.Username) > 24 {
+        return c.Status(fiber.StatusBadRequest).SendString("Username must be between 3 and 24 characters")
+    }
+
+    // Check length of password
+    if len(req.Data.Password) < 6 || len(req.Data.Password) > 24 {
+        return c.Status(fiber.StatusBadRequest).SendString("Password must be between 6 and 24 characters")
+    }
+
     // Check if email already in use
     var existing models.User
     if err := database.DB.Where("email = ?", req.Data.Email).First(&existing).Error; err == nil {
         return c.Status(fiber.StatusConflict).SendString("Email already in use")
+    }
+
+    // Check if username already in use
+    if err := database.DB.Where("username = ?", req.Data.Username).First(&existing).Error; err == nil {
+        return c.Status(fiber.StatusConflict).SendString("Username already in use")
     }
 
     // Hash password

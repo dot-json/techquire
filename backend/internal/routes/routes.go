@@ -11,6 +11,7 @@ func SetupRoutes(app *fiber.App) {
     app.Post("/auth", handlers.Login)
     app.Post("/register", handlers.Register)
     app.Post("/check-auth", handlers.CheckAuth)
+    app.Get("/users/:user_id", handlers.GetUser)
 
     // Example protected route
     // app.Get("/profile", middleware.JWTProtected(), handlers.Profile)

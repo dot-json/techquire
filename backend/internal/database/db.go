@@ -9,10 +9,24 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	"techquire-backend/internal/models"
 )
 
 // DB is a global variable for simplicity in a small project
 var DB *gorm.DB
+
+// ClearDB truncates the relevant tables
+func ClearDB() {
+    tables := []string{"users", "posts", "solutions", "comments", "reactions", "me_toos", "user_watchlist"}
+    for _, table := range tables {
+        err := DB.Exec(fmt.Sprintf("TRUNCATE TABLE %s RESTART IDENTITY CASCADE", table)).Error
+        if err != nil {
+            log.Fatalf("[DB] Failed to clear table %s: %v", table, err)
+        }
+        log.Printf("[DB] Table %s cleared!", table)
+    }
+}
 
 // ConnectDB initializes the connection to PostgreSQL
 func ConnectDB() {
@@ -31,7 +45,7 @@ func ConnectDB() {
         log.New(os.Stdout, "\r\n", log.LstdFlags),
         logger.Config{
             SlowThreshold: time.Second,
-            LogLevel:      logger.Warn,
+            LogLevel:      logger.Silent,
             Colorful:      true,
         },
     )
@@ -39,11 +53,25 @@ func ConnectDB() {
         Logger: newLogger,
     })
     if err != nil {
-        log.Fatalf("Failed to connect to Postgres: %v", err)
+        log.Fatalf("[DB] Failed to connect to Postgres: %v", err)
     }
 
     DB = db
-    log.Println("Connected to Postgres!")
+    log.Println("[DB] Connected to Postgres!")
+
+    // Auto-migrate the schema
+    log.Println("[DB] Starting auto-migration...")
+    if err := DB.AutoMigrate(&models.User{}, &models.Post{}, &models.Comment{}, &models.Solution{}, &models.Reaction{}, &models.MeToo{}); err != nil {
+        log.Fatalf("[ERROR] Failed to migrate database: %v", err)
+    }
+    log.Println("[DB] Auto-migration completed!")
+
+    // Clear tables and seed data
+    log.Println("[DB] Clearing tables...")
+    ClearDB()
+    log.Println("[DB] Seeding tables...")
+    SeedAll()
+    log.Println("[DB] Seeding completed!")
 }
 
 // getEnv gets an environment variable or returns a fallback
