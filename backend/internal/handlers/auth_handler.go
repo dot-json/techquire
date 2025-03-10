@@ -19,34 +19,49 @@ type LoginPayload struct {
 }
 
 func Login(c *fiber.Ctx) error {
-    var req struct {
-        Data LoginPayload `json:"data"`
-    }
-    if err := c.BodyParser(&req); err != nil {
-        return c.Status(fiber.StatusBadRequest).SendString("Invalid request body")
+    // Parse the login payload directly from the request body
+    var loginPayload LoginPayload
+    if err := c.BodyParser(&loginPayload); err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Invalid request body",
+        })
     }
 
     // Find user by email
     var user models.User
-    if err := database.DB.Where("email = ?", req.Data.Email).First(&user).Error; err != nil {
-        return c.Status(fiber.StatusUnauthorized).SendString("Invalid email or password")
+    if err := database.DB.Where("email = ?", loginPayload.Email).First(&user).Error; err != nil {
+        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+            "error": "User with email not found",
+        })
     }
 
     // Compare hashed password
-    if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Data.Password)); err != nil {
-        return c.Status(fiber.StatusUnauthorized).SendString("Invalid email or password")
+    if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginPayload.Password)); err != nil {
+        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+            "error": "Invalid password",
+        })
     }
 
-    // Create JWT
+    // Create JWT with MapClaims - same approach as in debug routes
     token := jwt.New(jwt.SigningMethodHS256)
     claims := token.Claims.(jwt.MapClaims)
-    claims["user_id"] = user.ID
+    claims["user_id"] = float64(user.ID)  // Store as float64 for consistency
     claims["exp"] = time.Now().Add(24 * time.Hour).Unix()
+    claims["iat"] = time.Now().Unix()
 
     secret := os.Getenv("JWT_SECRET")
+    if secret == "" {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "JWT_SECRET not set",
+        })
+    }
+
+    // Sign the token
     t, err := token.SignedString([]byte(secret))
     if err != nil {
-        return c.Status(fiber.StatusInternalServerError).SendString("Could not sign token")
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Could not sign token",
+        })
     }
 
     // Return user data + token
@@ -66,64 +81,68 @@ type RegisterPayload struct {
 }
 
 func Register(c *fiber.Ctx) error {
-    var req struct {
-        Data RegisterPayload `json:"data"`
-    }
-    if err := c.BodyParser(&req); err != nil {
-        return c.Status(fiber.StatusBadRequest).SendString("Invalid request body")
+    // Parse the register payload directly from the request body
+    var registerPayload RegisterPayload
+    if err := c.BodyParser(&registerPayload); err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Invalid request body",
+        })
     }
 
     // Validate input
-    if req.Data.Email == "" || req.Data.Username == "" || req.Data.Password == "" {
-        return c.Status(fiber.StatusBadRequest).SendString("Empty field in request body")
+    if registerPayload.Email == "" || registerPayload.Username == "" || registerPayload.Password == "" {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Email, username, and password are required",
+        })
     }
 
     // Check length of username
-    if len(req.Data.Username) < 3 || len(req.Data.Username) > 24 {
-        return c.Status(fiber.StatusBadRequest).SendString("Username must be between 3 and 24 characters")
+    if len(registerPayload.Username) < 3 || len(registerPayload.Username) > 24 {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Username must be between 3 and 24 characters",
+        })
     }
 
     // Check length of password
-    if len(req.Data.Password) < 6 || len(req.Data.Password) > 24 {
-        return c.Status(fiber.StatusBadRequest).SendString("Password must be between 6 and 24 characters")
+    if len(registerPayload.Password) < 6 || len(registerPayload.Password) > 24 {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Password must be between 6 and 24 characters",
+        })
     }
 
     // Check if email already in use
     var existing models.User
-    if err := database.DB.Where("email = ?", req.Data.Email).First(&existing).Error; err == nil {
-        return c.Status(fiber.StatusConflict).SendString("Email already in use")
+    if err := database.DB.Where("email = ?", registerPayload.Email).First(&existing).Error; err == nil {
+        return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+            "error": "Email already in use",
+        })
     }
 
     // Check if username already in use
-    if err := database.DB.Where("username = ?", req.Data.Username).First(&existing).Error; err == nil {
-        return c.Status(fiber.StatusConflict).SendString("Username already in use")
+    if err := database.DB.Where("username = ?", registerPayload.Username).First(&existing).Error; err == nil {
+        return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+            "error": "Username already in use",
+        })
     }
 
     // Hash password
-    hashed, err := bcrypt.GenerateFromPassword([]byte(req.Data.Password), bcrypt.DefaultCost)
+    hashed, err := bcrypt.GenerateFromPassword([]byte(registerPayload.Password), bcrypt.DefaultCost)
     if err != nil {
-        return c.Status(fiber.StatusInternalServerError).SendString("Could not create user")
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Could not create user",
+        })
     }
 
     // Create new user
     newUser := models.User{
-        Email:    req.Data.Email,
-        Username: req.Data.Username,
+        Email:    registerPayload.Email,
+        Username: registerPayload.Username,
         Password: string(hashed),
     }
     if err := database.DB.Create(&newUser).Error; err != nil {
-        return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-    }
-
-    // Optionally generate token right away
-    token := jwt.New(jwt.SigningMethodHS256)
-    claims := token.Claims.(jwt.MapClaims)
-    claims["user_id"] = newUser.ID
-    claims["exp"] = time.Now().Add(24 * time.Hour).Unix()
-
-    t, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
-    if err != nil {
-        return c.Status(fiber.StatusInternalServerError).SendString("Could not sign token")
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": err.Error(),
+        })
     }
 
     // Return user info + token
@@ -131,11 +150,10 @@ func Register(c *fiber.Ctx) error {
         "id":       newUser.ID,
         "email":    newUser.Email,
         "username": newUser.Username,
-        "token":    t,
     })
 }
 
-// CheckAuth is a middleware to check for a valid JWT
+// CheckAuth refreshes auth state
 func CheckAuth(c *fiber.Ctx) error {
     // Get token from header
     auth := c.Get("Authorization")

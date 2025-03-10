@@ -1,38 +1,22 @@
 import { cn } from "@/lib/utils";
-import React from "react";
 import { Button } from "./atoms/Button";
 import { Check, Eye, MessageSquareText, UserRoundPlus } from "lucide-react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { PostData } from "@/lib/interfaces";
+import { useDispatch } from "react-redux";
+import { AppDispatch } from "@/lib/store";
 
-interface PostProps {
-  id: number;
-  metoo?: boolean;
-  watched?: boolean;
-}
-
-const Post = ({ id, metoo, watched }: PostProps) => {
-  const content = `
-This is a normal paragraph.
-
-\`\`\`js
-console.log("Hello, world!");
-\`\`\`
-
-Another paragraph after the code.
-
-\`\`\`python
-print("Hello, world!")
-\`\`\`
-`;
+const formatContentWithCodeBlocks = (content: string) => {
   const codeBlockRegex = /```([\w]*)\n([\s\S]*?)```/g;
-
-  const formattedContent = [];
+  const formattedContent: (string | JSX.Element)[] = [];
   let lastIndex = 0;
 
   content.replace(codeBlockRegex, (match, lang, code, offset) => {
+    // Add text before the code block
     formattedContent.push(content.substring(lastIndex, offset));
 
+    // Add the code block with syntax highlighting
     formattedContent.push(
       <SyntaxHighlighter
         key={offset}
@@ -54,7 +38,29 @@ print("Hello, world!")
     return "";
   });
 
+  // Add any remaining text
   formattedContent.push(content.substring(lastIndex));
+
+  return formattedContent;
+};
+
+const Post = ({
+  id,
+  title,
+  content,
+  solution,
+  user,
+  comment_count,
+  created_at,
+  metoo,
+  watched,
+}: PostData) => {
+  const dispatch = useDispatch<AppDispatch>();
+
+  const formattedPostContent = formatContentWithCodeBlocks(content);
+  const formattedSolutionContent = solution
+    ? formatContentWithCodeBlocks(solution.content)
+    : null;
 
   return (
     <div
@@ -63,35 +69,52 @@ print("Hello, world!")
         "flex flex-col gap-4 rounded-xl border border-background-600/75 bg-background-900 p-4 transition-all",
       )}
     >
-      <h1 className={cn("text-2xl")}>{id + 1}. Question of the post</h1>
-      {formattedContent}
-      <p className={cn("text-text-400")}>
-        Posted at: {new Date().toLocaleDateString("hu-HU")}
-      </p>
-      <hr className={cn("border-t-background-600")} />
-      <div
-        className={cn(
-          "flex flex-col gap-4 rounded-md border border-success/25 bg-success/15 p-4",
-        )}
-      >
-        <h2 className={cn("text-xl font-medium text-success")}>Solution</h2>
-        <div
-          className={cn(
-            "flex flex-col gap-4 rounded-md border border-background-600 bg-background-900 p-4",
-          )}
-        >
-          <div className={cn("flex items-center gap-3")}>
-            <img
-              src="https://placehold.co/400x400"
-              alt="profile_pic"
-              className={cn("size-12 rounded-full border sm:size-12")}
-            />
-            <h1 className={cn("font-medium sm:text-base")}>username</h1>
-          </div>
-          {formattedContent}
-        </div>
+      <h1 className={cn("text-2xl")}>{title}</h1>
+      {formattedPostContent}
+      <div className={cn("flex items-center gap-1 text-text-500")}>
+        <p>Posted at</p>
+        <p>{new Date(created_at).toLocaleString("hu-HU")}</p>
+        <p className={cn("mx-1")}>|</p>
+        <p>By {user.username}</p>
       </div>
       <hr className={cn("border-t-background-600")} />
+
+      {solution && (
+        <>
+          <div
+            className={cn(
+              "flex flex-col gap-4 rounded-md border border-success/25 bg-success/15 p-4",
+            )}
+          >
+            <h2 className={cn("text-xl font-medium text-success")}>Solution</h2>
+            <div
+              className={cn(
+                "flex flex-col gap-4 rounded-md border border-background-600 bg-background-900 p-4",
+              )}
+            >
+              <div className={cn("flex items-center gap-3")}>
+                <img
+                  src="https://placehold.co/400x400"
+                  alt="profile_pic"
+                  className={cn("size-12 rounded-full border sm:size-12")}
+                />
+                <h1 className={cn("font-medium sm:text-base")}>
+                  {solution.user.username}
+                </h1>
+              </div>
+              {formattedSolutionContent}
+              <div className={cn("flex items-center gap-1 text-text-500")}>
+                <p>Posted at</p>
+                <p>{new Date(solution.created_at).toLocaleString("hu-HU")}</p>
+                <p className={cn("mx-1")}>|</p>
+                <p>By {solution.user.username}</p>
+              </div>
+            </div>
+          </div>
+          <hr className={cn("border-t-background-600")} />
+        </>
+      )}
+
       <div className={cn("flex items-center gap-4")}>
         <Button
           variant="ghost"
@@ -106,14 +129,14 @@ print("Hello, world!")
         </Button>
         <Button variant="ghost" title="Comments">
           <MessageSquareText size={20} />
-          23
+          {comment_count}
         </Button>
         <Button
           variant="ghost"
           name="Comments"
           className={cn(
             watched &&
-              "bg-secondary-500 hover:bg-secondary-600 active:bg-secondary-700 focus-visible:ring-secondary-500 hover:text-text-100",
+              "bg-secondary-500 hover:bg-secondary-600 hover:text-text-100 focus-visible:ring-secondary-500 active:bg-secondary-700",
           )}
           title={watched ? "Remove from watchlist" : "Add to watchlist"}
         >

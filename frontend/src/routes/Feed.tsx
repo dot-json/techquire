@@ -8,9 +8,33 @@ import {
   SelectValue,
 } from "@/components/atoms/Select";
 import Post from "@/components/Post";
+import { PostData } from "@/lib/interfaces";
+import { RootState } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import axios from "axios";
+import { useEffect, useState } from "react";
+import { useSelector } from "react-redux";
 
 const Feed = () => {
+  const [posts, setPosts] = useState<PostData[]>([]);
+  const { token } = useSelector((state: RootState) => state.user);
+
+  useEffect(() => {
+    const fetchPosts = async () => {
+      axios
+        .get(`${import.meta.env.VITE_SERVICE_URL}/posts`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
+        .then((res) => {
+          setPosts(res.data);
+        });
+    };
+    if (token) fetchPosts();
+  }, [token]);
+
   return (
     <div className={cn("grid flex-1 grid-cols-4 gap-4")}>
       <aside
@@ -44,8 +68,19 @@ const Feed = () => {
       </aside>
       <div className={cn("col-span-full py-4 sm:py-8 lg:col-span-3")}>
         <div className={cn("flex flex-col gap-4")}>
-          {Array.from({ length: 10 }).map((_, i) => (
-            <Post key={i} id={i} metoo={i % 3 == 0} watched={i % 2 === 0} />
+          {posts.map((post, i) => (
+            <Post
+              key={i}
+              id={post.id}
+              title={post.title}
+              content={post.content}
+              solution={post.solution}
+              user={post.user}
+              comment_count={post.comment_count}
+              metoo={i % 3 == 0}
+              watched={i % 2 === 0}
+              created_at={post.created_at}
+            />
           ))}
           <div
             className={cn(

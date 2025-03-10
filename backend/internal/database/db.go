@@ -18,7 +18,7 @@ var DB *gorm.DB
 
 // ClearDB truncates the relevant tables
 func ClearDB() {
-    tables := []string{"users", "posts", "solutions", "comments", "reactions", "me_toos", "user_watchlist"}
+    tables := []string{"users", "posts", "comments", "reactions", "me_toos", "user_watchlist"}
     for _, table := range tables {
         err := DB.Exec(fmt.Sprintf("TRUNCATE TABLE %s RESTART IDENTITY CASCADE", table)).Error
         if err != nil {
@@ -61,7 +61,7 @@ func ConnectDB() {
 
     // Auto-migrate the schema
     log.Println("[DB] Starting auto-migration...")
-    if err := DB.AutoMigrate(&models.User{}, &models.Post{}, &models.Comment{}, &models.Solution{}, &models.Reaction{}, &models.MeToo{}); err != nil {
+    if err := DB.AutoMigrate(&models.User{}, &models.Post{}, &models.Comment{}, &models.Reaction{}, &models.MeToo{}); err != nil {
         log.Fatalf("[ERROR] Failed to migrate database: %v", err)
     }
     log.Println("[DB] Auto-migration completed!")

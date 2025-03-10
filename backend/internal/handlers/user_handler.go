@@ -18,19 +18,19 @@ type publicUserData struct {
     NumberOfSolutions int    `json:"number_of_solutions"`
 }
 
-// GetUser returns the public user data for a given user ID
+// GetUser returns the public user data for a given username
 func GetUser(c *fiber.Ctx) error {
-    userID := c.Params("user_id")
+    username := c.Params("username")
 
     var user models.User
-    if err := database.DB.First(&user, userID).Error; err != nil {
+    if err := database.DB.Where("username = ?", username).First(&user).Error; err != nil {
         if err == gorm.ErrRecordNotFound {
             return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
                 "error": "User not found",
             })
         }
         return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-            "error": "Failed to retrieve user",
+            "error": "Failed to get user",
         })
     }
 

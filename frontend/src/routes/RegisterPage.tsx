@@ -27,7 +27,7 @@ const RegisterPage = () => {
     confirmPassword: "",
   });
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (
       !form.email ||
@@ -42,14 +42,16 @@ const RegisterPage = () => {
       toast.error("Passwords do not match");
       return;
     }
-    dispatch(
+    const resultAction = await dispatch(
       register({
         email: form.email,
         username: form.username,
         password: form.password,
       }),
     );
-    navigate("/login", { replace: true });
+    if (register.fulfilled.match(resultAction)) {
+      navigate("/login", { replace: true });
+    }
   };
 
   if (id !== -1) {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/joho/godotenv"
 
 	"techquire-backend/internal/database"
 	"techquire-backend/internal/models"
@@ -12,6 +13,10 @@ import (
 )
 
 func main() {
+    if err := godotenv.Load(); err != nil {
+        log.Println("Warning: .env file not found, using environment variables")
+    }
+
     // 1. Connect DB
     database.ConnectDB()
 

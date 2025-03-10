@@ -10,8 +10,24 @@ import (
 	"techquire-backend/internal/models"
 )
 
-// SeedUsers creates a bunch of fake users for testing purposes.
+// SeedUsers creates a default and a bunch of fake users for testing purposes.
 func SeedUsers() {
+    // Create a default user
+    default_hashed, err := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
+    if err != nil {
+        log.Printf("Error hashing password: %v", err)
+        return
+    }
+    defaultUser := models.User{
+        Email:    "default@email.com",
+        Username: "default",
+        Password: string(default_hashed),
+    }
+    if err := DB.Create(&defaultUser).Error; err != nil {
+        log.Printf("Error creating default user: %v", err)
+    }
+
+    // Create 10 random users
     for i := 0; i < 10; i++ {
         hashed, err := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
         if err != nil {
@@ -36,22 +52,53 @@ func SeedPosts() {
     var users []models.User
     DB.Find(&users)
 
+    if len(users) == 0 {
+        log.Printf("No users found for creating posts")
+        return
+    }
+
     for _, user := range users {
         for j := 0; j < rand.Intn(5)+1; j++ {
             post := models.Post{
                 Title:     faker.Sentence(),
                 Content:   faker.Paragraph(),
                 UserID:    user.ID,
-                MeTooCount: rand.Intn(len(users)), // Ensure MeTooCount does not exceed the number of users
+                // We'll calculate the actual MeTooCount after creating metoos
             }
             if err := DB.Create(&post).Error; err != nil {
                 log.Printf("Error creating post: %v", err)
                 continue
             }
 
-            // Create "me too" expressions for the post
-            for k := 0; k < post.MeTooCount; k++ {
-                meTooUser := users[rand.Intn(len(users))]
+            // Create a slice of eligible users for metoo (excluding post author)
+            var eligibleUsers []models.User
+            for _, u := range users {
+                if u.ID != post.UserID {
+                    eligibleUsers = append(eligibleUsers, u)
+                }
+            }
+            
+            // Skip if no eligible users
+            if len(eligibleUsers) == 0 {
+                continue
+            }
+            
+            // Shuffle the eligible users to randomize selection
+            rand.Shuffle(len(eligibleUsers), func(i, j int) {
+                eligibleUsers[i], eligibleUsers[j] = eligibleUsers[j], eligibleUsers[i]
+            })
+            
+            // Determine how many metoos to create (random, but not exceeding eligible users)
+            meTooCount := rand.Intn(len(eligibleUsers) + 1)
+            
+            // Select the first meTooCount users from shuffled slice (guaranteed to be unique)
+            selectedUsers := eligibleUsers
+            if meTooCount < len(eligibleUsers) {
+                selectedUsers = eligibleUsers[:meTooCount]
+            }
+            
+            // Create metoos for the selected users
+            for _, meTooUser := range selectedUsers {
                 meToo := models.MeToo{
                     UserID: meTooUser.ID,
                     PostID: post.ID,
@@ -60,6 +107,12 @@ func SeedPosts() {
                     log.Printf("Error creating 'me too': %v", err)
                     continue
                 }
+            }
+            
+            // Update the post's MeTooCount field with the actual count
+            post.MeTooCount = len(selectedUsers)
+            if err := DB.Save(&post).Error; err != nil {
+                log.Printf("Error updating post metoo count: %v", err)
             }
         }
     }
@@ -76,28 +129,21 @@ func SeedComments() {
             comment := models.Comment{
                 Content:  faker.Sentence(),
                 PostID:   post.ID,
-                UserID:   post.UserID,
+                UserID:   uint(rand.Intn(10)+1), // Randomly assign a user ID
                 Likes:    0, // Initialize likes to 0
                 Dislikes: 0, // Initialize dislikes to 0
+                IsSolution: false,
+            }
+            // If the post should have a solution, mark this comment as the solution
+            if hasSolution && comment.UserID != post.UserID {
+                comment.IsSolution = true
+                hasSolution = false // Ensure only one solution per post
             }
             if err := DB.Create(&comment).Error; err != nil {
                 log.Printf("Error creating comment: %v", err)
                 continue
             }
 
-            // If the post should have a solution, mark this comment as the solution
-            if hasSolution && k == 0 {
-                solution := models.Solution{
-                    Content: comment.Content,
-                    PostID:  post.ID,
-                    UserID:  comment.UserID,
-                }
-                if err := DB.Create(&solution).Error; err != nil {
-                    log.Printf("Error creating solution: %v", err)
-                    continue
-                }
-                hasSolution = false // Ensure only one solution per post
-            }
         }
     }
 }
@@ -187,7 +233,7 @@ func SeedAll() {
         var dislikes int64
 
         DB.Model(&models.Post{}).Where("user_id = ?", user.ID).Count(&postCount)
-        DB.Model(&models.Solution{}).Where("user_id = ?", user.ID).Count(&solutionCount)
+        DB.Model(&models.Comment{}).Where("user_id = ? AND is_solution = true", user.ID).Count(&solutionCount)
         DB.Model(&models.Comment{}).Where("user_id = ?", user.ID).Select("SUM(likes)").Scan(&likes)
         DB.Model(&models.Comment{}).Where("user_id = ?", user.ID).Select("SUM(dislikes)").Scan(&dislikes)
 

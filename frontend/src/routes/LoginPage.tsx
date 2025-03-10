@@ -23,19 +23,22 @@ const LoginPage = () => {
     password: "",
   });
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!form.email || !form.password) {
       toast.error("Please fill all the fields");
       return;
     }
-    dispatch(
+    const resultAction = await dispatch(
       login({
         email: form.email,
         password: form.password,
       }),
     );
-    navigate("/feed", { replace: true });
+
+    if (login.fulfilled.match(resultAction)) {
+      navigate("/feed", { replace: true });
+    }
   };
 
   if (id !== -1) {

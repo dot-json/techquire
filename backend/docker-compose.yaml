@@ -20,6 +20,7 @@ services:
     ports:
       - "8080:8080"
     environment:
+      JWT_SECRET: AOAYC6FZmWRH2B1zo09+FlR+3OISgPll4DSR4hu3hQI=
       DB_HOST: db # The hostname is the service name "db" in Docker Compose
       DB_PORT: "5432"
       DB_USER: postgres

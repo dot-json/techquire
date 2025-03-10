@@ -25,7 +25,7 @@ export const login = createAsyncThunk(
     try {
       const response = await axios.post(
         `${import.meta.env.VITE_SERVICE_URL}/auth`,
-        { data },
+        data,
         {
           headers: {
             "Content-Type": "application/json",
@@ -34,6 +34,7 @@ export const login = createAsyncThunk(
         },
       );
       const userData = response.data;
+      console.log(response.data);
       Cookie.set("user", JSON.stringify(userData), { expires: 1 });
 
       return userData;
@@ -53,16 +54,12 @@ export const register = createAsyncThunk(
     { rejectWithValue },
   ) => {
     try {
-      await axios.post(
-        `${import.meta.env.VITE_SERVICE_URL}/register`,
-        { data },
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-          responseType: "text",
+      await axios.post(`${import.meta.env.VITE_SERVICE_URL}/register`, data, {
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        responseType: "text",
+      });
     } catch (error: any) {
       if (!error.response) {
         return rejectWithValue("Service is not available");
@@ -111,6 +108,32 @@ export const checkAuth = createAsyncThunk(
   },
 );
 
+export const toggleMeToo = createAsyncThunk(
+  "user/toggleMeToo",
+  async (data: { postId: number; token: string }, { rejectWithValue }) => {
+    try {
+      const response = await axios.post(
+        `${import.meta.env.VITE_SERVICE_URL}/posts/${data.postId}/me-too`,
+        data,
+        {
+          headers: {
+            Authorization: `Bearer ${data.token}`,
+            "Content-Type": "application/json",
+          },
+          responseType: "json",
+        },
+      );
+
+      return response.data;
+    } catch (error: any) {
+      if (!error.response) {
+        return rejectWithValue("Service is not available");
+      }
+      return rejectWithValue(error.response.data);
+    }
+  },
+);
+
 const userSlice = createSlice({
   name: "user",
   initialState,
@@ -132,16 +155,18 @@ const userSlice = createSlice({
       state.error = null;
     });
     builder.addCase(login.rejected, (state, action) => {
-      state.error = action.payload as string;
-      toast.error(action.payload as string);
+      const error = (action.payload as { error: string }).error;
+      state.error = error;
+      toast.error(error);
     });
     builder.addCase(register.fulfilled, (state, _action) => {
       toast.success("Successfully registered");
       state.error = null;
     });
     builder.addCase(register.rejected, (state, action) => {
-      state.error = action.payload as string;
-      toast.error(action.payload as string);
+      const error = (action.payload as { error: string }).error;
+      state.error = error;
+      toast.error(error);
     });
     builder.addCase(checkAuth.fulfilled, (state, action) => {
       state.id = action.payload.id;
@@ -155,8 +180,9 @@ const userSlice = createSlice({
       state.email = "";
       state.username = "";
       state.token = "";
-      state.error = action.payload as string;
-      toast.error(action.payload as string);
+      const error = (action.payload as { error: string }).error;
+      state.error = error;
+      toast.error(error);
     });
   },
 });
