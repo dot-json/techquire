@@ -11,6 +11,7 @@ import { checkAuth } from "./lib/slices/userSlice";
 import { AppDispatch } from "./lib/store";
 import Feed from "./routes/Feed";
 import Profile from "./routes/Profile";
+import AccountSettings from "./routes/AccountSettings";
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -30,6 +31,7 @@ function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/feed" element={<Feed />} />
             <Route path="/profile/:handle" element={<Profile />} />
+            <Route path="/settings" element={<AccountSettings />} />
           </Routes>
         </MainLayout>
       </BrowserRouter>

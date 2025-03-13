@@ -185,5 +185,6 @@ func CheckAuth(c *fiber.Ctx) error {
         "id":       user.ID,
         "email":    user.Email,
         "username": user.Username,
+        "profile_picture_url": user.ProfilePictureURL,
     })
 }

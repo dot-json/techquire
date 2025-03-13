@@ -4,8 +4,10 @@ import { Check, Eye, MessageSquareText, UserRoundPlus } from "lucide-react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { PostData } from "@/lib/interfaces";
-import { useDispatch } from "react-redux";
-import { AppDispatch } from "@/lib/store";
+import { Link } from "react-router";
+import { useDispatch, useSelector } from "react-redux";
+import { AppDispatch, RootState } from "@/lib/store";
+import { toggleMeToo, toggleWatchlist } from "@/lib/slices/postSlice";
 
 const formatContentWithCodeBlocks = (content: string) => {
   const codeBlockRegex = /```([\w]*)\n([\s\S]*?)```/g;
@@ -52,21 +54,31 @@ const Post = ({
   user,
   comment_count,
   created_at,
-  metoo,
-  watched,
+  is_metoo,
+  metoo_count,
+  is_watchlisted,
 }: PostData) => {
-  const dispatch = useDispatch<AppDispatch>();
-
   const formattedPostContent = formatContentWithCodeBlocks(content);
   const formattedSolutionContent = solution
     ? formatContentWithCodeBlocks(solution.content)
     : null;
 
+  const dispatch = useDispatch<AppDispatch>();
+  const { token } = useSelector((state: RootState) => state.user);
+
+  const handleToggleMetoo = () => {
+    dispatch(toggleMeToo({ token, postId: id }));
+  };
+
+  const handleToggleWatchlist = () => {
+    dispatch(toggleWatchlist({ token, postId: id }));
+  };
+
   return (
     <div
       key={id}
       className={cn(
-        "flex flex-col gap-4 rounded-xl border border-background-600/75 bg-background-900 p-4 transition-all",
+        "flex flex-col gap-4 rounded-xl border border-background-600/75 bg-background-900 p-4",
       )}
     >
       <h1 className={cn("text-2xl")}>{title}</h1>
@@ -75,7 +87,17 @@ const Post = ({
         <p>Posted at</p>
         <p>{new Date(created_at).toLocaleString("hu-HU")}</p>
         <p className={cn("mx-1")}>|</p>
-        <p>By {user.username}</p>
+        <p>
+          By{" "}
+          <Link
+            to={`/profile/${user.username}`}
+            className={cn(
+              "rounded-sm px-0.5 underline decoration-transparent underline-offset-2 outline-none hover:decoration-text-500 focus-visible:ring-2 focus-visible:ring-text-500",
+            )}
+          >
+            {user.username}
+          </Link>
+        </p>
       </div>
       <hr className={cn("border-t-background-600")} />
 
@@ -107,7 +129,17 @@ const Post = ({
                 <p>Posted at</p>
                 <p>{new Date(solution.created_at).toLocaleString("hu-HU")}</p>
                 <p className={cn("mx-1")}>|</p>
-                <p>By {solution.user.username}</p>
+                <p>
+                  By{" "}
+                  <Link
+                    to={`/profile/${solution.user.username}`}
+                    className={cn(
+                      "rounded-sm px-0.5 underline decoration-transparent underline-offset-2 outline-none hover:decoration-text-500 focus-visible:ring-2 focus-visible:ring-text-500",
+                    )}
+                  >
+                    {solution.user.username}
+                  </Link>
+                </p>
               </div>
             </div>
           </div>
@@ -119,13 +151,14 @@ const Post = ({
         <Button
           variant="ghost"
           className={cn(
-            metoo &&
-              "bg-primary-500 hover:bg-primary-600 hover:text-text-100 focus-visible:ring-primary-500 active:bg-primary-700",
+            "hover:bg-primary-600 hover:text-text-100 focus-visible:ring-primary-500 active:bg-primary-700",
+            is_metoo && "bg-primary-500",
           )}
           title="Me Too"
+          onClick={handleToggleMetoo}
         >
           <UserRoundPlus size={20} />
-          23
+          {metoo_count}
         </Button>
         <Button variant="ghost" title="Comments">
           <MessageSquareText size={20} />
@@ -135,12 +168,13 @@ const Post = ({
           variant="ghost"
           name="Comments"
           className={cn(
-            watched &&
-              "bg-secondary-500 hover:bg-secondary-600 hover:text-text-100 focus-visible:ring-secondary-500 active:bg-secondary-700",
+            "hover:bg-secondary-600 hover:text-text-100 focus-visible:ring-secondary-500 active:bg-secondary-700",
+            is_watchlisted && "bg-secondary-500",
           )}
-          title={watched ? "Remove from watchlist" : "Add to watchlist"}
+          title={is_watchlisted ? "Remove from watchlist" : "Add to watchlist"}
+          onClick={handleToggleWatchlist}
         >
-          {watched ? (
+          {is_watchlisted ? (
             <>
               <Check size={20} /> Watching
             </>

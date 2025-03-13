@@ -15,8 +15,9 @@ func SetupRoutes(app *fiber.App) {
 
     app.Get("/users/:username", handlers.GetUser)
 
-    app.Post("/posts", handlers.CreatePost)
+    app.Post("/posts", middleware.JWTProtected(), handlers.CreatePost)
     app.Get("/posts", middleware.OptionalAuth(), handlers.GetPosts)
     app.Get("/posts/:post_id", middleware.OptionalAuth(), handlers.GetPost)
     app.Post("/posts/:post_id/metoo", middleware.JWTProtected(), handlers.ToggleMetoo)
+    app.Post("/posts/:post_id/watchlist", middleware.JWTProtected(), handlers.ToggleWatchlist)
 }

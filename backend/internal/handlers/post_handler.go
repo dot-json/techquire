@@ -12,12 +12,14 @@ import (
 // CreatePost handles the creation of a new post
 func CreatePost(c *fiber.Ctx) error {
     // Get user ID from the JWT token
-    userID, ok := c.Locals("user_id").(uint)
-    if !ok {
-        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+	var userID uint
+	if userIDFloat, ok := c.Locals("user_id").(float64); ok {
+        userID = uint(userIDFloat)
+	} else {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
             "error": "Unauthorized or invalid token",
         })
-    }
+	}
 
     // Parse the request body
     var postRequest struct {
@@ -52,7 +54,30 @@ func CreatePost(c *fiber.Ctx) error {
         })
     }
 
-    return c.Status(fiber.StatusCreated).JSON(post)
+    var user models.User
+    if err := database.DB.First(&user, post.UserID).Error; err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to retrieve user associated with post",
+        })
+    }
+
+    postData := fiber.Map{
+        "id":             post.ID,
+        "title":          post.Title,
+        "content":        post.Content,
+        "created_at":     post.CreatedAt,
+        "updated_at":     post.UpdatedAt,
+        "comment_count":  len(post.Comments),
+        "is_metoo":       false,
+        "metoo_count":    0,
+        "is_watchlisted": false,
+        "user": fiber.Map{
+            "id":       user.ID,
+            "username": user.Username,
+        },
+    }
+
+    return c.JSON(postData)
 }
 
 // GetPost handles retrieving a single post by its ID
@@ -242,13 +267,13 @@ func GetPosts(c *fiber.Ctx) error {
 
 // ToggleMetoo handles adding or removing a "metoo" reaction to a post
 func ToggleMetoo(c *fiber.Ctx) error {
-    // Get user ID from the JWT token (must be authenticated)
-    userID, ok := c.Locals("user_id").(uint)
-    if !ok {
-        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-            "error": "Unauthorized or invalid token",
-        })
-    }
+    // Get user ID from the JWT token
+	var userID uint
+	if userIDFloat, ok := c.Locals("user_id").(float64); ok {
+        userID = uint(userIDFloat)
+	} else {
+		userID = 0
+	}
 
     // Get post ID from URL parameter
     postID, err := c.ParamsInt("post_id")
@@ -283,9 +308,8 @@ func ToggleMetoo(c *fiber.Ctx) error {
             })
         }
         return c.JSON(fiber.Map{
-            "success": true,
-            "message": "Removed metoo",
-            "metoo":   false,
+            "id":      postID,
+            "is_metoo":   false,
         })
     } else if result.Error == gorm.ErrRecordNotFound {
         // MeToo doesn't exist, so create it
@@ -299,14 +323,88 @@ func ToggleMetoo(c *fiber.Ctx) error {
             })
         }
         return c.JSON(fiber.Map{
-            "success": true,
-            "message": "Added metoo",
-            "metoo":   true,
+            "id":      postID,
+            "is_metoo":   true,
         })
     } else {
         // Some other database error
         return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
             "error": "Database error",
+        })
+    }
+}
+
+// ToggleWatchlist handles adding or removing a post from the user's watchlist
+func ToggleWatchlist(c *fiber.Ctx) error {
+    // Get user ID from the JWT token
+    var userID uint
+    if userIDFloat, ok := c.Locals("user_id").(float64); ok {
+        userID = uint(userIDFloat)
+    } else {
+        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+            "error": "Authentication required",
+        })
+    }
+
+    // Get post ID from URL parameter
+    postID, err := c.ParamsInt("post_id")
+    if err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Invalid post ID",
+        })
+    }
+
+    // Check if post exists
+    var post models.Post
+    if err := database.DB.First(&post, postID).Error; err != nil {
+        if err == gorm.ErrRecordNotFound {
+            return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+                "error": "Post not found",
+            })
+        }
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to fetch post",
+        })
+    }
+
+    // Get the current user with their watchlist
+    var user models.User
+    if err := database.DB.Preload("Watchlist").First(&user, userID).Error; err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to fetch user data",
+        })
+    }
+
+    // Check if post is already in watchlist
+    isWatchlisted := false
+    for _, watchedPost := range user.Watchlist {
+        if watchedPost.ID == uint(postID) {
+            isWatchlisted = true
+            break
+        }
+    }
+
+    if isWatchlisted {
+        // Post is already in watchlist, so remove it
+        if err := database.DB.Model(&user).Association("Watchlist").Delete(&post); err != nil {
+            return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+                "error": "Failed to remove post from watchlist",
+            })
+        }
+        return c.JSON(fiber.Map{
+            "id":             postID,
+            "is_watchlisted": false,
+        })
+    } else {
+        // Post is not in watchlist, so add it
+        if err := database.DB.Model(&user).Association("Watchlist").Append(&post); err != nil {
+            return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+                "error": "Failed to add post to watchlist",
+            })
+        }
+        return c.JSON(fiber.Map{
+            "id":             postID,
+            "is_watchlisted": true,
         })
     }
 }

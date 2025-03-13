@@ -24,7 +24,7 @@ const Profile = () => {
           `${import.meta.env.VITE_SERVICE_URL}/posts?user_id=${profileData?.id}`,
         )
         .then((res) => {
-          setPosts(res.data);
+          if (res.data !== null) setPosts(res.data);
         });
     };
 
@@ -89,8 +89,9 @@ const Profile = () => {
           solution={post.solution}
           user={post.user}
           comment_count={post.comment_count}
-          metoo={i % 3 == 0}
-          watched={i % 2 === 0}
+          is_metoo={i % 3 == 0}
+          metoo_count={post.metoo_count}
+          is_watchlisted={i % 2 === 0}
           created_at={post.created_at}
         />
       ))}

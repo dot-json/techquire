@@ -26,6 +26,7 @@ export interface PostData {
   };
   comment_count: number;
   created_at: string;
-  metoo?: boolean;
-  watched?: boolean;
+  is_metoo: boolean;
+  metoo_count: number;
+  is_watchlisted: boolean;
 }

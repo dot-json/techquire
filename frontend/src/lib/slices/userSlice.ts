@@ -9,6 +9,7 @@ interface User {
   username: string;
   token: string;
   error: string | null;
+  loading: boolean;
 }
 
 const initialState: User = {
@@ -17,6 +18,7 @@ const initialState: User = {
   username: "",
   token: "",
   error: null,
+  loading: true,
 };
 
 export const login = createAsyncThunk(
@@ -34,8 +36,10 @@ export const login = createAsyncThunk(
         },
       );
       const userData = response.data;
-      console.log(response.data);
-      Cookie.set("user", JSON.stringify(userData), { expires: 1 });
+      Cookie.set("auth_token", userData.token, {
+        expires: 1,
+        sameSite: "strict",
+      });
 
       return userData;
     } catch (error: any) {
@@ -58,7 +62,7 @@ export const register = createAsyncThunk(
         headers: {
           "Content-Type": "application/json",
         },
-        responseType: "text",
+        responseType: "json",
       });
     } catch (error: any) {
       if (!error.response) {
@@ -73,8 +77,8 @@ export const checkAuth = createAsyncThunk(
   "user/checkAuth",
   async (_, { rejectWithValue }) => {
     try {
-      const userCookie = Cookie.get("user");
-      if (!userCookie) {
+      const token = Cookie.get("auth_token");
+      if (!token) {
         return {
           id: -1,
           email: "",
@@ -82,49 +86,25 @@ export const checkAuth = createAsyncThunk(
           token: "",
         };
       }
-      const userCookieData = JSON.parse(userCookie);
 
       const response = await axios.post(
         `${import.meta.env.VITE_SERVICE_URL}/check-auth`,
         {},
         {
           headers: {
-            Authorization: `Bearer ${userCookieData.token}`,
+            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
           responseType: "json",
         },
       );
-      const userData = { ...response.data, token: userCookieData.token };
-      Cookie.set("user", JSON.stringify(userData), { expires: 1 });
+      const userData = { ...response.data, token };
+      Cookie.set("auth_token", userData.token, {
+        expires: 1,
+        sameSite: "strict",
+      });
 
       return userData;
-    } catch (error: any) {
-      if (!error.response) {
-        return rejectWithValue("Service is not available");
-      }
-      return rejectWithValue(error.response.data);
-    }
-  },
-);
-
-export const toggleMeToo = createAsyncThunk(
-  "user/toggleMeToo",
-  async (data: { postId: number; token: string }, { rejectWithValue }) => {
-    try {
-      const response = await axios.post(
-        `${import.meta.env.VITE_SERVICE_URL}/posts/${data.postId}/me-too`,
-        data,
-        {
-          headers: {
-            Authorization: `Bearer ${data.token}`,
-            "Content-Type": "application/json",
-          },
-          responseType: "json",
-        },
-      );
-
-      return response.data;
     } catch (error: any) {
       if (!error.response) {
         return rejectWithValue("Service is not available");
@@ -147,26 +127,39 @@ const userSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
+    builder.addCase(login.pending, (state) => {
+      state.loading = true;
+    });
     builder.addCase(login.fulfilled, (state, action) => {
       state.id = action.payload.id;
       state.email = action.payload.email;
       state.username = action.payload.username;
       state.token = action.payload.token;
       state.error = null;
+      state.loading = false;
     });
     builder.addCase(login.rejected, (state, action) => {
       const error = (action.payload as { error: string }).error;
       state.error = error;
+      state.loading = false;
       toast.error(error);
+    });
+    builder.addCase(register.pending, (state) => {
+      state.loading = true;
     });
     builder.addCase(register.fulfilled, (state, _action) => {
       toast.success("Successfully registered");
       state.error = null;
+      state.loading = false;
     });
     builder.addCase(register.rejected, (state, action) => {
       const error = (action.payload as { error: string }).error;
       state.error = error;
+      state.loading = false;
       toast.error(error);
+    });
+    builder.addCase(checkAuth.pending, (state) => {
+      state.loading = true;
     });
     builder.addCase(checkAuth.fulfilled, (state, action) => {
       state.id = action.payload.id;
@@ -174,6 +167,7 @@ const userSlice = createSlice({
       state.username = action.payload.username;
       state.token = action.payload.token;
       state.error = null;
+      state.loading = false;
     });
     builder.addCase(checkAuth.rejected, (state, action) => {
       state.id = -1;
@@ -182,6 +176,7 @@ const userSlice = createSlice({
       state.token = "";
       const error = (action.payload as { error: string }).error;
       state.error = error;
+      state.loading = false;
       toast.error(error);
     });
   },
