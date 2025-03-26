@@ -27,7 +27,16 @@ WORKDIR /app
 
 # Copy the compiled binary from the builder stage
 COPY --from=builder /app/main /app/main
+COPY --from=builder /app/.env /app/.env
 RUN chmod +x /app/main
+
+# Create required directories with proper permissions
+RUN mkdir -p ./static/uploads/profile_pictures && \
+    chmod -R 777 ./static && \
+    chown -R appuser:appgroup ./static
+
+# Make sure appuser owns all files in /app
+RUN chown -R appuser:appgroup /app
 
 EXPOSE 8080
 EXPOSE 5432

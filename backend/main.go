@@ -2,6 +2,8 @@ package main
 
 import (
 	"log"
+	"os"
+	"path/filepath"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -13,8 +15,35 @@ import (
 )
 
 func main() {
-    if err := godotenv.Load(); err != nil {
-        log.Println("Warning: .env file not found, using environment variables")
+    // Get current directory
+    cwd, err := os.Getwd()
+    if err != nil {
+        log.Printf("Warning: Could not determine current directory: %v", err)
+    } else {
+        log.Printf("Current working directory: %s", cwd)
+    }
+
+    // Try to load .env from current directory first
+    err = godotenv.Load()
+    if err != nil {
+        // If that fails, try explicit path in the backend folder
+        backendEnvPath := filepath.Join(cwd, ".env")
+        err = godotenv.Load(backendEnvPath)
+        if err != nil {
+            log.Printf("Warning: .env file not found at %s, using environment variables", backendEnvPath)
+        } else {
+            log.Printf("Loaded environment from %s", backendEnvPath)
+        }
+    } else {
+        log.Println("Loaded environment from default location")
+    }
+
+    // Print JWT_SECRET length (without revealing the actual secret)
+    secretLen := len(os.Getenv("JWT_SECRET"))
+    if secretLen > 0 {
+        log.Printf("JWT_SECRET is set (length: %d)", secretLen)
+    } else {
+        log.Printf("WARNING: JWT_SECRET is not set!")
     }
 
     // 1. Connect DB
@@ -40,6 +69,26 @@ func main() {
     //      AllowMethods: "GET,POST,PUT,DELETE,OPTIONS",
     //      AllowHeaders: "Content-Type, Authorization",
     //  }))
+
+    // Check for static directory - don't fail if it doesn't exist
+    staticDir := "./static/uploads/profile_pictures"
+    if _, err := os.Stat(staticDir); os.IsNotExist(err) {
+        log.Printf("Notice: Static directory doesn't exist: %s", staticDir)
+        log.Printf("This is expected when running in Docker as it should be created in the Dockerfile")
+        log.Printf("For local development, make sure to create this directory manually")
+        
+        // Try to create it, but don't fail if we can't
+        if err := os.MkdirAll(staticDir, 0755); err != nil {
+            log.Printf("Warning: Could not create static directory: %s", err)
+        } else {
+            log.Printf("Created static directory: %s", staticDir)
+        }
+    } else {
+        log.Printf("Static directory exists: %s", staticDir)
+    }
+
+    // Set up static file serving
+    app.Static("/static", "./static")
 
     // 5. Setup routes
     routes.SetupRoutes(app)

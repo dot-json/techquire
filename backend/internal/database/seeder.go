@@ -13,17 +13,18 @@ import (
 // SeedUsers creates a default and a bunch of fake users for testing purposes.
 func SeedUsers() {
     // Create a default user
-    default_hashed, err := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
+    admin_hashed, err := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
     if err != nil {
         log.Printf("Error hashing password: %v", err)
         return
     }
-    defaultUser := models.User{
-        Email:    "default@email.com",
-        Username: "default",
-        Password: string(default_hashed),
+    adminUser := models.User{
+        Email:    "admin@email.com",
+        Username: "admin",
+        Password: string(admin_hashed),
+        Role:    "admin",
     }
-    if err := DB.Create(&defaultUser).Error; err != nil {
+    if err := DB.Create(&adminUser).Error; err != nil {
         log.Printf("Error creating default user: %v", err)
     }
 
@@ -114,6 +115,9 @@ func SeedPosts() {
             if err := DB.Save(&post).Error; err != nil {
                 log.Printf("Error updating post metoo count: %v", err)
             }
+
+            // Update the post creation date to a random date within the last 30 days
+            DB.Model(&post).Update("created_at", faker.Date())
         }
     }
 }
@@ -169,10 +173,10 @@ func SeedReactions() {
             reaction = models.Reaction{
                 UserID:    user.ID,
                 CommentID: comment.ID,
-                Type:      "positive",
+                Type:      "like",
             }
-            if rand.Intn(4) == 0 { // 25% chance of a negative reaction
-                reaction.Type = "negative"
+            if rand.Intn(4) == 0 { // 25% chance of a dislike
+                reaction.Type = "dislike"
             }
             if err := DB.Create(&reaction).Error; err != nil {
                 log.Printf("Error creating reaction: %v", err)
@@ -180,7 +184,7 @@ func SeedReactions() {
             }
 
             // Update comment reactions count
-            if reaction.Type == "positive" {
+            if reaction.Type == "like" {
                 comment.Likes++
             } else {
                 comment.Dislikes++

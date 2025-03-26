@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./atoms/DropdownMenu";
-import { CircleUserRound, LogOutIcon, Pencil } from "lucide-react";
+import { LogOutIcon, Pencil } from "lucide-react";
 import { useState } from "react";
 import CreatePost from "./CreatePost";
 
@@ -20,7 +20,9 @@ const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch();
-  const { id, username } = useSelector((state: RootState) => state.user);
+  const { id, username, profile_picture_url } = useSelector(
+    (state: RootState) => state.user,
+  );
   const [newPostOpen, setNewPostOpen] = useState<boolean>(false);
 
   return (
@@ -79,7 +81,15 @@ const Header = () => {
                     "rounded-full outline-none focus-visible:ring-2 focus-visible:ring-background-100 focus-visible:ring-offset-2 focus-visible:ring-offset-background-900",
                   )}
                 >
-                  <CircleUserRound size={28} strokeWidth={1.75} />
+                  <img
+                    src={
+                      profile_picture_url
+                        ? `${import.meta.env.VITE_SERVICE_URL}${profile_picture_url}`
+                        : "https://www.gravatar.com/avatar/?d=identicon&s=400"
+                    }
+                    alt="header_profile_picture"
+                    className={cn("size-8 rounded-full")}
+                  />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="bottom" align="end" sideOffset={8}>
                   <DropdownMenuLabel>{username}</DropdownMenuLabel>
@@ -127,9 +137,7 @@ const Header = () => {
         <CreatePost
           isModal={true}
           onClose={() => setNewPostOpen(false)}
-          className={cn(
-            "z-50 h-full w-full max-w-[50rem] border-none sm:h-fit sm:border",
-          )}
+          className={cn("z-50 h-full w-full max-w-[50rem] sm:h-fit sm:border")}
         />
       </div>
     </>

@@ -5,18 +5,84 @@ import { PostData } from "../interfaces";
 
 interface Posts {
   posts: PostData[];
+  pagination: {
+    page: number;
+    limit: number;
+    total_posts: number;
+    total_pages: number;
+    has_more: boolean;
+  };
+  loading: boolean;
 }
 
 const initialState: Posts = {
   posts: [],
+  pagination: {
+    page: 1,
+    limit: 10,
+    total_posts: 0,
+    total_pages: 0,
+    has_more: false,
+  },
+  loading: false,
 };
 
 export const fetchPosts = createAsyncThunk(
   "posts/fetchPosts",
-  async (token: string, { rejectWithValue }) => {
+  async (
+    {
+      token,
+      page = 1,
+      limit = 10,
+      user_id = undefined,
+      search = "",
+      sort_by = "created_at",
+      sort_dir = "desc",
+      append = false,
+    }: {
+      token: string;
+      user_id?: number;
+      page?: number;
+      limit?: number;
+      search?: string;
+      sort_by?: string;
+      sort_dir?: string;
+      append?: boolean;
+    },
+    { rejectWithValue },
+  ) => {
     try {
       const response = await axios.get(
-        `${import.meta.env.VITE_SERVICE_URL}/posts`,
+        `${import.meta.env.VITE_SERVICE_URL}/posts?user_id=${user_id === undefined ? "" : user_id}&page=${page}&limit=${limit}&sort_by=${sort_by}&sort_dir=${sort_dir}&search=${search}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+      return {
+        data: response.data,
+        append: append,
+      };
+    } catch (error: any) {
+      if (!error.response) {
+        return rejectWithValue("Service is not available");
+      }
+      return rejectWithValue(error.response.data);
+    }
+  },
+);
+
+export const fetchPost = createAsyncThunk(
+  "posts/fetchPost",
+  async (
+    { token, post_id }: { token: string; post_id: number },
+    { rejectWithValue },
+  ) => {
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_SERVICE_URL}/posts/${post_id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -57,8 +123,33 @@ export const createPost = createAsyncThunk(
           },
         },
       );
-      toast.success("Post created");
       return response.data;
+    } catch (error: any) {
+      if (!error.response) {
+        return rejectWithValue("Service is not available");
+      }
+      return rejectWithValue(error.response.data);
+    }
+  },
+);
+
+export const deletePost = createAsyncThunk(
+  "posts/deletePost",
+  async (
+    { post_id, token }: { post_id: number; token: string },
+    { rejectWithValue },
+  ) => {
+    try {
+      await axios.delete(
+        `${import.meta.env.VITE_SERVICE_URL}/posts/${post_id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+      return post_id;
     } catch (error: any) {
       if (!error.response) {
         return rejectWithValue("Service is not available");
@@ -70,15 +161,17 @@ export const createPost = createAsyncThunk(
 
 export const toggleMeToo = createAsyncThunk(
   "posts/toggleMeToo",
-  async (data: { postId: number; token: string }, { rejectWithValue }) => {
+  async (
+    { post_id, token }: { post_id: number; token: string },
+    { rejectWithValue },
+  ) => {
     try {
-      console.log(data);
       const response = await axios.post(
-        `${import.meta.env.VITE_SERVICE_URL}/posts/${data.postId}/metoo`,
+        `${import.meta.env.VITE_SERVICE_URL}/posts/${post_id}/metoo`,
         {},
         {
           headers: {
-            Authorization: `Bearer ${data.token}`,
+            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
           responseType: "json",
@@ -96,14 +189,17 @@ export const toggleMeToo = createAsyncThunk(
 
 export const toggleWatchlist = createAsyncThunk(
   "posts/toggleWatchlist",
-  async (data: { postId: number; token: string }, { rejectWithValue }) => {
+  async (
+    { post_id, token }: { post_id: number; token: string },
+    { rejectWithValue },
+  ) => {
     try {
       const response = await axios.post(
-        `${import.meta.env.VITE_SERVICE_URL}/posts/${data.postId}/watchlist`,
+        `${import.meta.env.VITE_SERVICE_URL}/posts/${post_id}/watchlist`,
         {},
         {
           headers: {
-            Authorization: `Bearer ${data.token}`,
+            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
           responseType: "json",
@@ -119,22 +215,157 @@ export const toggleWatchlist = createAsyncThunk(
   },
 );
 
+export const createComment = createAsyncThunk(
+  "posts/createComment",
+  async (
+    {
+      token,
+      post_id,
+      content,
+    }: { token: string; post_id: number; content: string },
+    { rejectWithValue },
+  ) => {
+    try {
+      const response = await axios.post(
+        `${import.meta.env.VITE_SERVICE_URL}/posts/${post_id}/comment`,
+        { content },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+      return response.data;
+    } catch (error: any) {
+      if (!error.response) {
+        return rejectWithValue("Service is not available");
+      }
+      return rejectWithValue(error.response.data);
+    }
+  },
+);
+
+export const deleteComment = createAsyncThunk(
+  "posts/deleteComment",
+  async (
+    {
+      post_id,
+      comment_id,
+      token,
+    }: { post_id: number; comment_id: number; token: string },
+    { rejectWithValue },
+  ) => {
+    try {
+      await axios.delete(
+        `${import.meta.env.VITE_SERVICE_URL}/posts/comment/${comment_id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+      return { comment_id, post_id };
+    } catch (error: any) {
+      if (!error.response) {
+        return rejectWithValue("Service is not available");
+      }
+      return rejectWithValue(error.response.data);
+    }
+  },
+);
+
+export const react = createAsyncThunk(
+  "posts/react",
+  async (
+    {
+      post_id,
+      comment_id,
+      reaction,
+      token,
+    }: {
+      post_id: number;
+      comment_id: number;
+      reaction: "like" | "dislike";
+      token: string;
+    },
+    { rejectWithValue },
+  ) => {
+    try {
+      const response = await axios.post(
+        `${import.meta.env.VITE_SERVICE_URL}/posts/comment/${comment_id}/react`,
+        { reaction },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+      return { ...response.data, post_id };
+    } catch (error: any) {
+      if (!error.response) {
+        return rejectWithValue("Service is not available");
+      }
+      return rejectWithValue(error.response.data);
+    }
+  },
+);
+
 const postSlice = createSlice({
   name: "posts",
   initialState,
   reducers: {},
   extraReducers: (builder) => {
+    builder.addCase(fetchPosts.pending, (state) => {
+      state.loading = true;
+    });
     builder.addCase(fetchPosts.fulfilled, (state, action) => {
-      state.posts = action.payload;
+      const { data, append } = action.payload;
+      if (append) {
+        state.posts = [...state.posts, ...data.posts];
+      } else {
+        state.posts = data.posts;
+      }
+      state.pagination = data.pagination;
+      state.loading = false;
     });
     builder.addCase(fetchPosts.rejected, (state) => {
       state.posts = [];
+      state.loading = false;
       toast.error("Failed to fetch posts");
+    });
+    builder.addCase(fetchPost.pending, (state) => {
+      state.loading = true;
+    });
+    builder.addCase(fetchPost.fulfilled, (state, action) => {
+      state.posts = [action.payload];
+      state.loading = false;
+    });
+    builder.addCase(fetchPost.rejected, (state) => {
+      state.posts = [];
+      state.loading = false;
+      toast.error("Failed to fetch post");
+    });
+    builder.addCase(createPost.pending, (state) => {
+      state.loading = true;
     });
     builder.addCase(createPost.fulfilled, (state, action) => {
       state.posts = [action.payload, ...state.posts];
+      state.loading = false;
+      toast.success("Post created");
     });
-    builder.addCase(createPost.rejected, (_state, action) => {
+    builder.addCase(createPost.rejected, (state, action) => {
+      const error = (action.payload as { error: string }).error;
+      state.loading = false;
+      toast.error(error);
+    });
+    builder.addCase(deletePost.fulfilled, (state, action) => {
+      state.posts = state.posts.filter((post) => post.id !== action.payload);
+      toast.success("Post deleted");
+    });
+    builder.addCase(deletePost.rejected, (_state, action) => {
       const error = (action.payload as { error: string }).error;
       toast.error(error);
     });
@@ -162,6 +393,55 @@ const postSlice = createSlice({
       state.posts[index].is_watchlisted = action.payload.is_watchlisted;
     });
     builder.addCase(toggleWatchlist.rejected, (_state, action) => {
+      const error = (action.payload as { error: string }).error;
+      toast.error(error);
+    });
+    builder.addCase(createComment.fulfilled, (state, action) => {
+      const index = state.posts.findIndex(
+        (post) => post.id === action.payload.post_id,
+      );
+      state.posts[index].comments = [
+        action.payload,
+        ...(state.posts[index].comments || []),
+      ];
+      toast.success("Comment posted");
+    });
+    builder.addCase(createComment.rejected, (_state, action) => {
+      const error = (action.payload as { error: string }).error;
+      toast.error(error);
+    });
+    builder.addCase(deleteComment.fulfilled, (state, action) => {
+      const postIndex = state.posts.findIndex(
+        (post) => post.id === action.payload.post_id,
+      );
+      state.posts[postIndex].comments =
+        state.posts[postIndex].comments?.filter(
+          (comment) => comment.id !== action.payload.comment_id,
+        ) || [];
+      toast.success("Comment deleted");
+    });
+    builder.addCase(deleteComment.rejected, (_state, action) => {
+      const error = (action.payload as { error: string }).error;
+      toast.error(error);
+    });
+    builder.addCase(react.fulfilled, (state, action) => {
+      console.log(action.payload);
+      const postIndex = state.posts.findIndex((post) =>
+        post.comments?.some((comment) => comment.id === action.payload.id),
+      );
+      const commentIndex = state.posts[postIndex].comments?.findIndex(
+        (comment) => comment.id === action.payload.id,
+      );
+      state.posts[postIndex].comments![commentIndex!].like_count =
+        action.payload.like_count;
+      state.posts[postIndex].comments![commentIndex!].dislike_count =
+        action.payload.dislike_count;
+      state.posts[postIndex].comments![commentIndex!].is_liked =
+        action.payload.is_liked;
+      state.posts[postIndex].comments![commentIndex!].is_disliked =
+        action.payload.is_disliked;
+    });
+    builder.addCase(react.rejected, (_state, action) => {
       const error = (action.payload as { error: string }).error;
       toast.error(error);
     });

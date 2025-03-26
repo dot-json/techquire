@@ -69,6 +69,8 @@ func Login(c *fiber.Ctx) error {
         "id":       user.ID,
         "email":    user.Email,
         "username": user.Username,
+        "profile_picture_url": user.ProfilePictureURL,
+        "role":     user.Role,
         "token":    t,
     })
 }
@@ -147,9 +149,7 @@ func Register(c *fiber.Ctx) error {
 
     // Return user info + token
     return c.JSON(fiber.Map{
-        "id":       newUser.ID,
-        "email":    newUser.Email,
-        "username": newUser.Username,
+        "message": "Registration successful",
     })
 }
 
@@ -186,5 +186,6 @@ func CheckAuth(c *fiber.Ctx) error {
         "email":    user.Email,
         "username": user.Username,
         "profile_picture_url": user.ProfilePictureURL,
+        "role":     user.Role,
     })
 }

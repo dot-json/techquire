@@ -12,6 +12,7 @@ import { AppDispatch } from "./lib/store";
 import Feed from "./routes/Feed";
 import Profile from "./routes/Profile";
 import AccountSettings from "./routes/AccountSettings";
+import OpenedPost from "./routes/OpenedPost";
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -30,6 +31,7 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/feed" element={<Feed />} />
+            <Route path="/post/:post_id" element={<OpenedPost />} />
             <Route path="/profile/:handle" element={<Profile />} />
             <Route path="/settings" element={<AccountSettings />} />
           </Routes>

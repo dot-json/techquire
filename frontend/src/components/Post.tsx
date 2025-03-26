@@ -67,25 +67,32 @@ const Post = ({
   const { token } = useSelector((state: RootState) => state.user);
 
   const handleToggleMetoo = () => {
-    dispatch(toggleMeToo({ token, postId: id }));
+    dispatch(toggleMeToo({ token, post_id: id }));
   };
 
   const handleToggleWatchlist = () => {
-    dispatch(toggleWatchlist({ token, postId: id }));
+    dispatch(toggleWatchlist({ token, post_id: id }));
   };
 
   return (
     <div
       key={id}
       className={cn(
-        "flex flex-col gap-4 rounded-xl border border-background-600/75 bg-background-900 p-4",
+        "flex flex-col gap-4 rounded-lg border border-background-600/75 bg-background-900 p-4",
       )}
     >
-      <h1 className={cn("text-2xl")}>{title}</h1>
+      <Link
+        to={`/post/${id}`}
+        className={cn(
+          "cursor-pointer text-2xl underline decoration-transparent underline-offset-4 transition-colors hover:decoration-text-100",
+        )}
+      >
+        {title}
+      </Link>
       {formattedPostContent}
       <div className={cn("flex items-center gap-1 text-text-500")}>
         <p>Posted at</p>
-        <p>{new Date(created_at).toLocaleString("hu-HU")}</p>
+        <p>{new Date(created_at).toLocaleString("en-US")}</p>
         <p className={cn("mx-1")}>|</p>
         <p>
           By{" "}
@@ -116,7 +123,11 @@ const Post = ({
             >
               <div className={cn("flex items-center gap-3")}>
                 <img
-                  src="https://placehold.co/400x400"
+                  src={
+                    solution.user.profile_picture_url
+                      ? `${import.meta.env.VITE_SERVICE_URL}${solution.user.profile_picture_url}`
+                      : "https://www.gravatar.com/avatar/?d=identicon&s=400"
+                  }
                   alt="profile_pic"
                   className={cn("size-12 rounded-full border sm:size-12")}
                 />
@@ -127,7 +138,7 @@ const Post = ({
               {formattedSolutionContent}
               <div className={cn("flex items-center gap-1 text-text-500")}>
                 <p>Posted at</p>
-                <p>{new Date(solution.created_at).toLocaleString("hu-HU")}</p>
+                <p>{new Date(solution.created_at).toLocaleString("en-US")}</p>
                 <p className={cn("mx-1")}>|</p>
                 <p>
                   By{" "}
@@ -160,10 +171,12 @@ const Post = ({
           <UserRoundPlus size={20} />
           {metoo_count}
         </Button>
-        <Button variant="ghost" title="Comments">
-          <MessageSquareText size={20} />
-          {comment_count}
-        </Button>
+        <Link to={`/post/${id}`}>
+          <Button variant="ghost" title="Comments">
+            <MessageSquareText size={20} />
+            {comment_count}
+          </Button>
+        </Link>
         <Button
           variant="ghost"
           name="Comments"

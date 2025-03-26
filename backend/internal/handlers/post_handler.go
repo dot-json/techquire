@@ -25,6 +25,7 @@ func CreatePost(c *fiber.Ctx) error {
     var postRequest struct {
         Title   string `json:"title"`
         Content string `json:"content"`
+        Tags   []string `json:"tags"`
     }
     
     if err := c.BodyParser(&postRequest); err != nil {
@@ -44,6 +45,7 @@ func CreatePost(c *fiber.Ctx) error {
     post := models.Post{
         Title:   postRequest.Title,
         Content: postRequest.Content,
+        Tags:    postRequest.Tags,
         UserID:  userID,
     }
 
@@ -65,6 +67,7 @@ func CreatePost(c *fiber.Ctx) error {
         "id":             post.ID,
         "title":          post.Title,
         "content":        post.Content,
+        "tags":           post.Tags,
         "created_at":     post.CreatedAt,
         "updated_at":     post.UpdatedAt,
         "comment_count":  len(post.Comments),
@@ -80,13 +83,75 @@ func CreatePost(c *fiber.Ctx) error {
     return c.JSON(postData)
 }
 
+// DeletePost handles the deletion of a post
+func DeletePost(c *fiber.Ctx) error {
+    // Get user ID from the JWT token
+    var userID uint
+    if userIDFloat, ok := c.Locals("user_id").(float64); ok {
+        userID = uint(userIDFloat)
+    } else {
+        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+            "error": "Unauthorized or invalid token",
+        })
+    }
+
+    var user models.User
+    if err := database.DB.First(&user, userID).Error; err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to retrieve user data",
+        })
+    }
+
+    // Get post ID from URL parameter
+    postID, err := c.ParamsInt("post_id")
+    if err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Invalid post ID",
+        })
+    }
+
+    // Check if post exists
+    var post models.Post
+    if err := database.DB.First(&post, postID).Error; err != nil {
+        if err == gorm.ErrRecordNotFound {
+            return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+                "error": "Post not found",
+            })
+        }
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to fetch post",
+        })
+    }
+
+    // Check if the user is the author of the post
+    // Admins and moderators can delete any post
+    if post.UserID != userID && user.Role != "admin" && user.Role != "moderator" {
+        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+            "error": "You are not the author of this post",
+        })
+    }
+
+    // Delete the post
+    if err := database.DB.Delete(&post).Error; err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to delete post",
+        })
+    }
+
+    return c.JSON(fiber.Map{
+        "message": "Post deleted successfully",
+    })
+}
+
 // GetPost handles retrieving a single post by its ID
 func GetPost(c *fiber.Ctx) error {
     postID := c.Params("post_id")
 
     var post models.Post
-    // Preload the Comments relationship to get an accurate count
-    if err := database.DB.Preload("Comments").First(&post, postID).Error; err != nil {
+    // Preload the Comments relationship with ordering
+    if err := database.DB.Preload("Comments", func(db *gorm.DB) *gorm.DB {
+        return db.Order("created_at DESC")
+    }).First(&post, postID).Error; err != nil {
         if err == gorm.ErrRecordNotFound {
             return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
                 "error": "Post not found",
@@ -114,7 +179,10 @@ func GetPost(c *fiber.Ctx) error {
     database.DB.Model(&models.MeToo{}).Where("post_id = ?", post.ID).Count(&metooCount)
     
     // Check if current user is authenticated
-    if userID, ok := c.Locals("user_id").(uint); ok && userID > 0 {
+    var userID uint
+    if userIDFloat, ok := c.Locals("user_id").(float64); ok && userIDFloat > 0 {
+        userID = uint(userIDFloat)
+        
         // Check if current user has a metoo
         var meTooEntry models.MeToo
         isMetoo = database.DB.Where("post_id = ? AND user_id = ?", post.ID, userID).First(&meTooEntry).Error == nil
@@ -125,20 +193,68 @@ func GetPost(c *fiber.Ctx) error {
         isWatchlisted = watchCount > 0
     }
 
+    // Format comments to needs
+    formattedComments := make([]fiber.Map, 0, len(post.Comments))
+    for _, comment := range post.Comments {
+        var commentAuthor models.User
+        if err := database.DB.First(&commentAuthor, comment.UserID).Error; err != nil {
+            log.Printf("Error fetching author for comment %d: %v", comment.ID, err)
+            continue
+        }
+
+        // Check if the current user has liked or disliked this comment
+        var isLiked, isDisliked bool
+
+        // Only check reactions if user is authenticated
+        if userID > 0 {
+            var reaction models.Reaction
+            result := database.DB.Where("comment_id = ? AND user_id = ?", comment.ID, userID).First(&reaction)
+            if result.Error == nil {
+                // User has a reaction
+                isLiked = reaction.Type == "like"
+                isDisliked = reaction.Type == "dislike"
+            }
+        }
+        
+        // Format the comment with proper JSON structure
+        formattedComment := fiber.Map{
+            "id":         comment.ID,
+            "content":    comment.Content,
+            "post_id":    comment.PostID,
+            "is_solution": comment.IsSolution,
+            "created_at": comment.CreatedAt,
+            "updated_at": comment.UpdatedAt,
+            "like_count":      comment.Likes,
+            "dislike_count":   comment.Dislikes,
+            "is_liked":       isLiked,
+            "is_disliked":    isDisliked,
+            "user": fiber.Map{
+                "id":                 commentAuthor.ID,
+                "username":           commentAuthor.Username,
+                "profile_picture_url": commentAuthor.ProfilePictureURL,
+            },
+        }
+        
+        formattedComments = append(formattedComments, formattedComment)
+    }
+
     // Initialize the response without solution
     response := fiber.Map{
         "id":             post.ID,
         "title":          post.Title,
         "content":        post.Content,
+        "tags":           post.Tags,
         "created_at":     post.CreatedAt,
         "updated_at":     post.UpdatedAt,
         "comment_count":  len(post.Comments),
+        "comments":       formattedComments,
         "is_metoo":       isMetoo,
         "metoo_count":    metooCount,
         "is_watchlisted": isWatchlisted,
         "user": fiber.Map{
             "id":       user.ID,
             "username": user.Username,
+            "profile_picture_url": user.ProfilePictureURL,
         },
     }
 
@@ -167,6 +283,26 @@ func GetPost(c *fiber.Ctx) error {
 // GetPosts handles retrieving a list of posts
 // Can optionally filter by user_id query parameter
 func GetPosts(c *fiber.Ctx) error {
+    // Parse pagination parameters
+    page := c.QueryInt("page", 1)         // Default to page 1
+    limit := c.QueryInt("limit", 10)      // Default to 10 posts per page
+    sortBy := c.Query("sort_by", "created_at") // Default sort by creation date
+    sortDir := c.Query("sort_dir", "desc")     // Default sort direction is descending (newest first)
+
+    // Validate and cap limits
+    if limit > 50 {
+        limit = 50 // Cap at 50 to prevent abuse
+    }
+    if limit < 1 {
+        limit = 10 // Minimum 1, default to 10 if invalid
+    }
+    if page < 1 {
+        page = 1 // Minimum page 1
+    }
+
+    // Calculate offset
+    offset := (page - 1) * limit
+
     // Check if a user_id query parameter is provided
     userIDParam := c.Query("user_id")
     
@@ -178,9 +314,40 @@ func GetPosts(c *fiber.Ctx) error {
         query = query.Where("user_id = ?", userIDParam)
     }
     
-    // Execute the query
+    // Add search functionality
+    searchQuery := c.Query("search")
+    if searchQuery != "" {
+        query = query.Where("title LIKE ? OR content LIKE ?", "%"+searchQuery+"%", "%"+searchQuery+"%")
+    }
+
+    // Filter by tags
+    tagsQuery := c.Query("tags")
+    if tagsQuery != "" {
+        query = query.Where("tags LIKE ?", "%"+tagsQuery+"%")
+    }
+
+    // Count total posts for pagination metadata
+    var totalPosts int64
+    if err := query.Model(&models.Post{}).Count(&totalPosts).Error; err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to count posts",
+        })
+    }
+
+    // Build sorting
+    orderClause := sortBy
+    if sortDir == "asc" {
+        orderClause = orderClause + " ASC"
+    } else {
+        orderClause = orderClause + " DESC"
+    }
+
+    // Add secondary sort by ID to ensure consistent ordering
+    orderClause = orderClause + ", id DESC"
+
+    // Execute the query with pagination and ordering
     var posts []models.Post
-    if err := query.Find(&posts).Error; err != nil {
+    if err := query.Order(orderClause).Limit(limit).Offset(offset).Find(&posts).Error; err != nil {
         return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
             "error": "Failed to retrieve posts",
         })
@@ -194,8 +361,8 @@ func GetPosts(c *fiber.Ctx) error {
 		userID = 0
 	}
 
-    // Create response objects
-    var response []fiber.Map
+    // Create returnedPosts objects
+    var returnedPosts []fiber.Map
     for _, post := range posts {
         var user models.User
         if err := database.DB.First(&user, post.UserID).Error; err != nil {
@@ -237,6 +404,7 @@ func GetPosts(c *fiber.Ctx) error {
             "user": fiber.Map{
                 "id":       user.ID,
                 "username": user.Username,
+                "profile_picture_url": user.ProfilePictureURL,
             },
         }
 
@@ -254,15 +422,29 @@ func GetPosts(c *fiber.Ctx) error {
                     "user": fiber.Map{
                         "id":       solver.ID,
                         "username": solver.Username,
+                        "profile_picture_url": solver.ProfilePictureURL,
                     },
                 }
             }
         }
 
-        response = append(response, postData)
+        returnedPosts = append(returnedPosts, postData)
     }
 
-    return c.JSON(response)
+    // Calculate pagination metadata
+    totalPages := (int(totalPosts) + limit - 1) / limit
+    hasMore := page < totalPages
+
+    return c.JSON(fiber.Map{
+        "posts":     returnedPosts,
+        "pagination": fiber.Map{
+            "page":         page,
+            "limit":        limit,
+            "total_posts":  totalPosts,
+            "total_pages":  totalPages,
+            "has_more":     hasMore,
+        },
+    })
 }
 
 // ToggleMetoo handles adding or removing a "metoo" reaction to a post
@@ -407,4 +589,340 @@ func ToggleWatchlist(c *fiber.Ctx) error {
             "is_watchlisted": true,
         })
     }
+}
+
+// CreateComment handles the creation of a new comment on a post
+func CreateComment(c* fiber.Ctx) error {
+    // Get user ID from the JWT token
+    var userID uint
+    if userIDFloat, ok := c.Locals("user_id").(float64); ok {
+        userID = uint(userIDFloat)
+    } else {
+        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+            "error": "Unauthorized or invalid token",
+        })
+    }
+
+    // Get post ID from URL parameter
+    postID, err := c.ParamsInt("post_id")
+    if err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Invalid post ID",
+        })
+    }
+
+    // Parse the request body
+    var commentRequest struct {
+        Content string `json:"content"`
+    }
+    
+    if err := c.BodyParser(&commentRequest); err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Failed to parse request body",
+        })
+    }
+
+    // Validate the comment data
+    if commentRequest.Content == "" {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Content is required",
+        })
+    }
+
+    // Check if post exists
+    var post models.Post
+    if err := database.DB.First(&post, postID).Error; err != nil {
+        if err == gorm.ErrRecordNotFound {
+            return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+                "error": "Post not found",
+            })
+        }
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to fetch post",
+        })
+    }
+
+    // Create the comment with the user ID from the token
+    comment := models.Comment{
+        Content: commentRequest.Content,
+        PostID:  uint(postID),
+        UserID:  userID,
+    }
+
+    // Create the comment in the database
+    if err := database.DB.Create(&comment).Error; err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to create comment",
+        })
+    }
+
+    // Fetch user separately
+    var user models.User
+    if err := database.DB.First(&user, comment.UserID).Error; err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to retrieve user associated with comment",
+        })
+    }
+
+    commentData := fiber.Map{
+        "id":         comment.ID,
+        "content":    comment.Content,
+        "post_id":    comment.PostID,
+        "user": fiber.Map{
+            "id":       user.ID,
+            "username": user.Username,
+            "profile_picture_url": user.ProfilePictureURL,
+        },
+        "created_at": comment.CreatedAt,
+        "like_count":      comment.Likes,
+        "dislike_count":   comment.Dislikes,
+    }
+
+    return c.JSON(commentData)
+}
+
+// DeleteComment handles the deletion of a comment
+func DeleteComment(c *fiber.Ctx) error {
+    // Get user ID from the JWT token
+    var userID uint
+    if userIDFloat, ok := c.Locals("user_id").(float64); ok {
+        userID = uint(userIDFloat)
+    } else {
+        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+            "error": "Unauthorized or invalid token",
+        })
+    }
+
+    var user models.User
+    if err := database.DB.First(&user, userID).Error; err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to retrieve user data",
+        })
+    }
+
+    // Get comment ID from URL parameter
+    commentID, err := c.ParamsInt("comment_id")
+    if err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Invalid comment ID",
+        })
+    }
+
+    // Check if comment exists
+    var comment models.Comment
+    if err := database.DB.First(&comment, commentID).Error; err != nil {
+        if err == gorm.ErrRecordNotFound {
+            return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+                "error": "Comment not found",
+            })
+        }
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to fetch comment",
+        })
+    }
+
+    // Check if the user is the author of the comment
+    // Admins and moderators can delete any comment
+    if comment.UserID != userID && user.Role != "admin" && user.Role != "moderator" {
+        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+            "error": "You are not the author of this comment",
+        })
+    }
+
+    // Delete the comment
+    if err := database.DB.Delete(&comment).Error; err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to delete comment",
+        })
+    }
+
+    return c.JSON(fiber.Map{
+        "message": "Comment deleted successfully",
+    })
+}
+
+// React handles adding a like or dislike to a comment
+func React(c *fiber.Ctx) error {
+    // Get user ID from the JWT token
+    var userID uint
+    if userIDFloat, ok := c.Locals("user_id").(float64); ok {
+        userID = uint(userIDFloat)
+    } else {
+        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+            "error": "Unauthorized or invalid token",
+        })
+    }
+
+    // Get comment ID from URL parameter
+    commentID, err := c.ParamsInt("comment_id")
+    if err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Invalid comment ID",
+        })
+    }
+
+    // Parse the request body
+    var reactionRequest struct {
+        Reaction string `json:"reaction"`
+    }
+    
+    if err := c.BodyParser(&reactionRequest); err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Failed to parse request body",
+        })
+    }
+
+    // Validate the reaction data
+    if reactionRequest.Reaction != "like" && reactionRequest.Reaction != "dislike" {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Invalid reaction type",
+        })
+    }
+
+    // Use a transaction to ensure data consistency
+    tx := database.DB.Begin()
+    defer func() {
+        if r := recover(); r != nil {
+            tx.Rollback()
+        }
+    }()
+
+    // Check if comment exists
+    var comment models.Comment
+    if err := tx.First(&comment, commentID).Error; err != nil {
+        tx.Rollback()
+        if err == gorm.ErrRecordNotFound {
+            return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+                "error": "Comment not found",
+            })
+        }
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to fetch comment",
+        })
+    }
+
+    // Check if the user has already reacted to the comment
+    var existingReaction models.Reaction
+    result := tx.Where("comment_id = ? AND user_id = ?", commentID, userID).First(&existingReaction)
+
+    // Variables to track the final state
+    var isLiked, isDisliked bool
+    
+    if result.Error == nil {
+        // Reaction exists, store the old type
+        oldReactionType := existingReaction.Type
+        
+        // If the same reaction is clicked again, remove it (toggle off)
+        if existingReaction.Type == reactionRequest.Reaction {
+            if err := tx.Delete(&existingReaction).Error; err != nil {
+                tx.Rollback()
+                return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+                    "error": "Failed to remove reaction",
+                })
+            }
+            
+            // Decrement the appropriate count
+            if oldReactionType == "like" {
+                if comment.Likes > 0 {
+                    comment.Likes--
+                }
+            } else if oldReactionType == "dislike" {
+                if comment.Dislikes > 0 {
+                    comment.Dislikes--
+                }
+            }
+            
+            // User has no reaction after removal
+            isLiked = false
+            isDisliked = false
+            
+        } else {
+            // User is changing their reaction type
+            existingReaction.Type = reactionRequest.Reaction
+            
+            if err := tx.Save(&existingReaction).Error; err != nil {
+                tx.Rollback()
+                return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+                    "error": "Failed to update reaction",
+                })
+            }
+            
+            // Update counts based on the change
+            if oldReactionType == "like" && reactionRequest.Reaction == "dislike" {
+                if comment.Likes > 0 {
+                    comment.Likes--
+                }
+                comment.Dislikes++
+                
+                // Set new reaction state
+                isLiked = false
+                isDisliked = true
+                
+            } else if oldReactionType == "dislike" && reactionRequest.Reaction == "like" {
+                if comment.Dislikes > 0 {
+                    comment.Dislikes--
+                }
+                comment.Likes++
+                
+                // Set new reaction state
+                isLiked = true
+                isDisliked = false
+            }
+        }
+    } else if result.Error == gorm.ErrRecordNotFound {
+        // Reaction doesn't exist, so create it
+        newReaction := models.Reaction{
+            CommentID: uint(commentID),
+            UserID:    userID,
+            Type:      reactionRequest.Reaction,
+        }
+        
+        if err := tx.Create(&newReaction).Error; err != nil {
+            tx.Rollback()
+            return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+                "error": "Failed to add reaction",
+            })
+        }
+        
+        // Increment the appropriate count
+        if reactionRequest.Reaction == "like" {
+            comment.Likes++
+            isLiked = true
+            isDisliked = false
+        } else if reactionRequest.Reaction == "dislike" {
+            comment.Dislikes++
+            isLiked = false
+            isDisliked = true
+        }
+    } else {
+        // Some other database error
+        tx.Rollback()
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Database error",
+        })
+    }
+    
+    // Save the updated comment with new counts
+    if err := tx.Save(&comment).Error; err != nil {
+        tx.Rollback()
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to update comment counts",
+        })
+    }
+    
+    // Commit the transaction
+    if err := tx.Commit().Error; err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to commit transaction",
+        })
+    }
+    
+    // Return the updated comment data
+    return c.JSON(fiber.Map{
+        "id":               commentID,
+        "like_count":       comment.Likes,
+        "dislike_count":    comment.Dislikes,
+        "is_liked":         isLiked,
+        "is_disliked":      isDisliked,
+    })
 }
