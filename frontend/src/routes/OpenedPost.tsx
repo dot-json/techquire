@@ -22,6 +22,7 @@ import {
   deleteComment,
   fetchPost,
   react,
+  toggleMarkAsSolution,
   toggleMeToo,
   toggleWatchlist,
 } from "@/lib/slices/postSlice";
@@ -114,6 +115,9 @@ const OpenedPost = () => {
     });
   };
 
+  const handleToggleSolution = (comment_id: number) => {
+    dispatch(toggleMarkAsSolution({ token, post_id, comment_id }));
+  };
   useEffect(() => {
     const loadPost = async () => {
       await dispatch(fetchPost({ token, post_id: post_id }));
@@ -227,9 +231,25 @@ const OpenedPost = () => {
                 "flex flex-col gap-4 rounded-md border border-success/25 bg-success/15 p-4",
               )}
             >
-              <h2 className={cn("text-xl font-medium text-success")}>
-                Solution
-              </h2>
+              <div className={cn("flex items-center justify-between")}>
+                <h2 className={cn("text-xl font-medium text-success")}>
+                  Solution
+                </h2>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() =>
+                    posts[0].solution &&
+                    handleToggleSolution(posts[0].solution.id)
+                  }
+                  className={cn(
+                    "text-text-400 hover:bg-error/25 hover:text-error active:bg-error/40",
+                  )}
+                >
+                  <X size={16} />
+                  Remove Solution
+                </Button>
+              </div>
               <div
                 className={cn(
                   "flex flex-col gap-4 rounded-md border border-background-600 bg-background-900 p-4",
@@ -373,6 +393,21 @@ const OpenedPost = () => {
                     <ThumbsDown size={16} />
                     {comment.dislike_count}
                   </Button>
+                  {posts[0].solution === null && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "px-2 text-sm",
+                        comment.is_solution &&
+                          "bg-success/50 hover:bg-success/40 active:bg-success/60",
+                      )}
+                      onClick={() => handleToggleSolution(comment.id)}
+                    >
+                      <Check size={16} />
+                      Mark as Solution
+                    </Button>
+                  )}
                 </div>
               </div>
               {(id === comment.user.id ||

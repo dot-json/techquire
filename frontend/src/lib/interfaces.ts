@@ -39,7 +39,7 @@ export interface PostData {
       profile_picture_url: string | null;
     };
     created_at: string;
-  };
+  } | null;
   user: {
     id: number;
     username: string;

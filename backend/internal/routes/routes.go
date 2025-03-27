@@ -13,6 +13,7 @@ func SetupRoutes(app *fiber.App) {
     app.Post("/check-auth", handlers.CheckAuth)
 
     app.Get("/users/:username", handlers.GetUser)
+    app.Get("/users/:user_id/posts", middleware.OptionalAuth(), handlers.GetUserPosts)
     app.Put("/users/update-username", middleware.JWTProtected(), handlers.UpdateUsername)
     app.Put("/users/update-password", middleware.JWTProtected(), handlers.UpdatePassword)
     app.Put("/users/update-role", middleware.JWTProtected(), handlers.UpdateUserRole)
@@ -27,6 +28,7 @@ func SetupRoutes(app *fiber.App) {
     app.Post("/posts/:post_id/comment", middleware.JWTProtected(), handlers.CreateComment)
     app.Delete("/posts/comment/:comment_id", middleware.JWTProtected(), handlers.DeleteComment)
     app.Post("/posts/comment/:comment_id/react", middleware.JWTProtected(), handlers.React)
+    app.Put("/posts/comment/:comment_id/solution", middleware.JWTProtected(), handlers.ToggleMarkCommentAsSolution)
 
     app.Static("/uploads", "./uploads")
 }

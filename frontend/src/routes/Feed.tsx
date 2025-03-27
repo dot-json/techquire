@@ -13,9 +13,21 @@ import Post from "@/components/Post";
 import { fetchPosts } from "@/lib/slices/postSlice";
 import { AppDispatch, RootState } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { Loader2 } from "lucide-react";
-import { useEffect } from "react";
+import { Loader2, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+
+interface FilterOptions {
+  metoos: boolean;
+  watchlisted: boolean;
+  solved: boolean;
+  unsolved: boolean;
+}
+type SortOption =
+  | "created_at_desc"
+  | "created_at_asc"
+  | "metoo_count_desc"
+  | "metoo_count_asc";
 
 const Feed = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -24,21 +36,104 @@ const Feed = () => {
     (state: RootState) => state.post,
   );
 
-  useEffect(() => {
-    dispatch(fetchPosts({ token, page: 1, append: false }));
-  }, [token]);
+  const [filters, setFilters] = useState<FilterOptions>({
+    metoos: false,
+    watchlisted: false,
+    solved: false,
+    unsolved: false,
+  });
+  const [sortBy, setSortBy] = useState<SortOption>("created_at_desc");
+  const [activeFiltersCount, setActiveFiltersCount] = useState(0);
+  const [isFilterChanged, setIsFilterChanged] = useState(false);
+
+  // Load posts with current filters and sort
+  const loadPosts = (page = 1, append = false) => {
+    // Convert filter options to API parameters
+    const params: Record<string, any> = {
+      token,
+      page,
+      append,
+    };
+
+    // Handle sort parameters
+    const [sort_by1, sort_by2, direction] = sortBy.split("_");
+    params.sort_by = `${sort_by1}_${sort_by2}`;
+    params.sort_dir = direction;
+
+    // Add filter parameters if selected
+    if (filters.metoos) params.is_metoo = true;
+    if (filters.watchlisted) params.is_watchlisted = true;
+    if (filters.solved) params.has_solution = true;
+    if (filters.unsolved) params.has_solution = false;
+
+    dispatch(fetchPosts({ token, ...params }));
+  };
+
+  // Handle checkbox changes
+  const handleFilterChange = (filterName: keyof FilterOptions) => {
+    setFilters((prev) => ({
+      ...prev,
+      [filterName]: !prev[filterName],
+    }));
+  };
+
+  // Handle sort changes
+  const handleSortChange = (value: string) => {
+    setSortBy(value as SortOption);
+  };
+
+  // Reset all filters
+  const resetFilters = () => {
+    setFilters({
+      metoos: false,
+      watchlisted: false,
+      solved: false,
+      unsolved: false,
+    });
+    setSortBy("created_at_desc");
+  };
 
   const handleLoadMore = () => {
     if (pagination.has_more) {
-      dispatch(
-        fetchPosts({
-          token,
-          page: pagination.page + 1,
-          append: true,
-        }),
-      );
+      loadPosts(pagination.page + 1, true);
     }
   };
+
+  useEffect(() => {
+    loadPosts(1, false);
+  }, [token]);
+
+  // Handle filter changes
+  useEffect(() => {
+    // Count active filters for UI
+    const count = Object.values(filters).filter(Boolean).length;
+    setActiveFiltersCount(count);
+
+    // Only reload if this isn't the initial render
+    if (isFilterChanged) {
+      loadPosts(1, false);
+    } else {
+      setIsFilterChanged(true);
+    }
+  }, [filters, sortBy]);
+
+  // This effect will reload posts if any filtered properties change
+  useEffect(() => {
+    // Skip the initial render and only run on updates
+    if (isFilterChanged && posts.length > 0) {
+      // Check if we need to reload based on active filters
+      const needsReload =
+        (filters.metoos && posts.some((post) => !post.is_metoo)) ||
+        (filters.watchlisted && posts.some((post) => !post.is_watchlisted)) ||
+        (filters.solved && posts.some((post) => !post.solution)) ||
+        (filters.unsolved && posts.some((post) => post.solution));
+
+      if (needsReload) {
+        // Reload the current page
+        loadPosts(pagination.page, false);
+      }
+    }
+  }, [posts]);
 
   return (
     <div className={cn("grid flex-1 grid-cols-4 gap-4")}>
@@ -47,25 +142,54 @@ const Feed = () => {
           "sticky top-[5.5rem] z-10 hidden h-fit flex-col gap-2 rounded-lg border border-background-600/75 bg-background-900 p-4 lg:flex",
         )}
       >
-        <h2 className={cn("text-lg text-text-200")}>Filters</h2>
+        <div className="flex items-center justify-between">
+          <h2 className={cn("text-lg text-text-200")}>Filters</h2>
+          {activeFiltersCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={resetFilters}
+              className="h-6 px-2 text-xs text-text-400 hover:text-text-100"
+            >
+              <X className="mr-1 h-3 w-3" />
+              Reset
+            </Button>
+          )}
+        </div>
         <div className={cn("flex flex-col gap-2 px-2")}>
-          <Checkbox label="Filter 1" />
-          <Checkbox label="Filter 2" />
-          <Checkbox label="Filter 3" />
+          <Checkbox
+            label="Me toos"
+            checked={filters.metoos}
+            onCheckedChange={() => handleFilterChange("metoos")}
+          />
+          <Checkbox
+            label="Watchlisted"
+            checked={filters.watchlisted}
+            onCheckedChange={() => handleFilterChange("watchlisted")}
+          />
+          <Checkbox
+            label="Solved"
+            checked={filters.solved}
+            onCheckedChange={() => handleFilterChange("solved")}
+          />
+          <Checkbox
+            label="Unsolved"
+            checked={filters.unsolved}
+            onCheckedChange={() => handleFilterChange("unsolved")}
+          />
         </div>
         <div className={cn("flex flex-col gap-2")}>
           <h2 className={cn("text-lg text-text-200")}>Sorting</h2>
-          <Select>
+          <Select value={sortBy} onValueChange={handleSortChange}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select a fruit" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="apple">Apple</SelectItem>
-                <SelectItem value="banana">Banana</SelectItem>
-                <SelectItem value="blueberry">Blueberry</SelectItem>
-                <SelectItem value="grapes">Grapes</SelectItem>
-                <SelectItem value="pineapple">Pineapple</SelectItem>
+                <SelectItem value="created_at_desc">Newest first</SelectItem>
+                <SelectItem value="created_at_asc">Oldest first</SelectItem>
+                <SelectItem value="metoo_count_desc">Most me toos</SelectItem>
+                <SelectItem value="metoo_count_asc">Least me toos</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
@@ -109,8 +233,14 @@ const Feed = () => {
             </Button>
           )}
           {!pagination.has_more && posts.length > 0 && (
-            <div className="py-4 text-center text-text-400">
+            <div className={cn("py-4 text-center text-text-400")}>
               You've reached the end of the posts!
+            </div>
+          )}
+          {posts.length === 0 && !loading && (
+            <div className={cn("py-4 text-center text-text-400")}>
+              No posts available. Try adjusting your filters or creating a new
+              post.
             </div>
           )}
         </div>

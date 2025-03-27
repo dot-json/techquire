@@ -36,6 +36,10 @@ export const fetchPosts = createAsyncThunk(
       limit = 10,
       user_id = undefined,
       search = "",
+      tags = "",
+      is_metoo = false,
+      is_watchlisted = false,
+      has_solution = undefined,
       sort_by = "created_at",
       sort_dir = "desc",
       append = false,
@@ -45,6 +49,10 @@ export const fetchPosts = createAsyncThunk(
       page?: number;
       limit?: number;
       search?: string;
+      tags?: string;
+      is_metoo?: boolean;
+      is_watchlisted?: boolean;
+      has_solution?: boolean;
       sort_by?: string;
       sort_dir?: string;
       append?: boolean;
@@ -52,13 +60,25 @@ export const fetchPosts = createAsyncThunk(
     { rejectWithValue },
   ) => {
     try {
+      // Build params object with only defined values
+      const params: Record<string, any> = { page, limit };
+      if (user_id !== undefined) params.user_id = user_id;
+      if (sort_by !== undefined) params.sort_by = sort_by;
+      if (sort_dir !== undefined) params.sort_dir = sort_dir;
+      if (is_metoo !== undefined) params.is_metoo = is_metoo;
+      if (is_watchlisted !== undefined) params.is_watchlisted = is_watchlisted;
+      if (has_solution !== undefined) params.has_solution = has_solution;
+      if (search !== undefined) params.search = search;
+      if (tags !== undefined) params.tags = tags;
+
       const response = await axios.get(
-        `${import.meta.env.VITE_SERVICE_URL}/posts?user_id=${user_id === undefined ? "" : user_id}&page=${page}&limit=${limit}&sort_by=${sort_by}&sort_dir=${sort_dir}&search=${search}`,
+        `${import.meta.env.VITE_SERVICE_URL}/posts`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
+          params,
         },
       );
       return {
@@ -91,6 +111,49 @@ export const fetchPost = createAsyncThunk(
         },
       );
       return response.data;
+    } catch (error: any) {
+      if (!error.response) {
+        return rejectWithValue("Service is not available");
+      }
+      return rejectWithValue(error.response.data);
+    }
+  },
+);
+
+export const fetchUserPosts = createAsyncThunk(
+  "posts/fetchUserPosts",
+  async (
+    {
+      token,
+      user_id,
+      page = 1,
+      limit = 10,
+    }: {
+      token: string;
+      user_id: number;
+      page?: number;
+      limit?: number;
+    },
+    { rejectWithValue },
+  ) => {
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_SERVICE_URL}/users/${user_id}/posts`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          params: {
+            page,
+            limit,
+          },
+        },
+      );
+      return {
+        data: response.data,
+        append: false,
+      };
     } catch (error: any) {
       if (!error.response) {
         return rejectWithValue("Service is not available");
@@ -313,6 +376,37 @@ export const react = createAsyncThunk(
   },
 );
 
+export const toggleMarkAsSolution = createAsyncThunk(
+  "posts/toggleMarkAsSolution",
+  async (
+    {
+      post_id,
+      comment_id,
+      token,
+    }: { post_id: number; comment_id: number; token: string },
+    { rejectWithValue },
+  ) => {
+    try {
+      const response = await axios.put(
+        `${import.meta.env.VITE_SERVICE_URL}/posts/comment/${comment_id}/solution`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+      return { ...response.data, post_id };
+    } catch (error: any) {
+      if (!error.response) {
+        return rejectWithValue("Service is not available");
+      }
+      return rejectWithValue(error.response.data);
+    }
+  },
+);
+
 const postSlice = createSlice({
   name: "posts",
   initialState,
@@ -347,6 +441,24 @@ const postSlice = createSlice({
       state.posts = [];
       state.loading = false;
       toast.error("Failed to fetch post");
+    });
+    builder.addCase(fetchUserPosts.pending, (state) => {
+      state.loading = true;
+    });
+    builder.addCase(fetchUserPosts.fulfilled, (state, action) => {
+      const { data, append } = action.payload;
+      if (append) {
+        state.posts = [...state.posts, ...data.posts];
+      } else {
+        state.posts = data.posts;
+      }
+      state.pagination = data.pagination;
+      state.loading = false;
+    });
+    builder.addCase(fetchUserPosts.rejected, (state) => {
+      state.posts = [];
+      state.loading = false;
+      toast.error("Failed to fetch user posts");
     });
     builder.addCase(createPost.pending, (state) => {
       state.loading = true;
@@ -418,6 +530,10 @@ const postSlice = createSlice({
         state.posts[postIndex].comments?.filter(
           (comment) => comment.id !== action.payload.comment_id,
         ) || [];
+      // if solution is deleted, set solution to null
+      if (state.posts[postIndex].solution?.id === action.payload.comment_id) {
+        state.posts[postIndex].solution = null;
+      }
       toast.success("Comment deleted");
     });
     builder.addCase(deleteComment.rejected, (_state, action) => {
@@ -442,6 +558,25 @@ const postSlice = createSlice({
         action.payload.is_disliked;
     });
     builder.addCase(react.rejected, (_state, action) => {
+      const error = (action.payload as { error: string }).error;
+      toast.error(error);
+    });
+    builder.addCase(toggleMarkAsSolution.fulfilled, (state, action) => {
+      const postIndex = state.posts.findIndex(
+        (post) => post.id === action.payload.post_id,
+      );
+      const commentIndex = state.posts[postIndex].comments?.findIndex(
+        (comment) => comment.id === action.payload.id,
+      );
+      state.posts[postIndex].comments![commentIndex!].is_solution =
+        action.payload.is_solution;
+      if (action.payload.is_solution) {
+        state.posts[postIndex].solution = action.payload.solution;
+      } else {
+        state.posts[postIndex].solution = null;
+      }
+    });
+    builder.addCase(toggleMarkAsSolution.rejected, (_state, action) => {
       const error = (action.payload as { error: string }).error;
       toast.error(error);
     });

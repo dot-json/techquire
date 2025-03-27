@@ -1,7 +1,7 @@
 import { Button } from "@/components/atoms/Button";
 import Post from "@/components/Post";
 import { ProfileData } from "@/lib/interfaces";
-import { fetchPosts } from "@/lib/slices/postSlice";
+import { fetchPosts, fetchUserPosts } from "@/lib/slices/postSlice";
 import { AppDispatch, RootState } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import axios from "axios";
@@ -30,15 +30,12 @@ const Profile = () => {
       const res = await axios.get(
         `${import.meta.env.VITE_SERVICE_URL}/users/${handle}`,
       );
-      console.log(res.data);
       setProfileData(res.data);
     };
 
     fetchProfileData();
     if (profileData?.id) {
-      dispatch(
-        fetchPosts({ token, page: 1, append: false, user_id: profileData.id }),
-      );
+      dispatch(fetchUserPosts({ token, page: 1, user_id: profileData.id }));
     }
   }, [handle, profileData?.id]);
 
