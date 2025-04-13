@@ -1,13 +1,17 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"strings"
 	"techquire-backend/internal/database"
 	"techquire-backend/internal/models"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -23,32 +27,95 @@ func CreatePost(c *fiber.Ctx) error {
         })
 	}
 
-    // Parse the request body
-    var postRequest struct {
-        Title   string `json:"title"`
-        Content string `json:"content"`
-        Tags   []string `json:"tags"`
+    var title, content string
+    var tags []string
+    var pictures []string
+    
+    form, err := c.MultipartForm()
+    if err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Failed to parse form data",
+        })
+    }
+    // Extract form fields
+    if titleFields := form.Value["title"]; len(titleFields) > 0 {
+        title = titleFields[0]
     }
     
-    if err := c.BodyParser(&postRequest); err != nil {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-            "error": "Failed to parse request body",
-        })
+    if contentFields := form.Value["content"]; len(contentFields) > 0 {
+        content = contentFields[0]
+    }
+    
+    // Extract tags - handle as array
+    if tagsFields := form.Value["tags"]; len(tagsFields) > 0 {
+        tags = tagsFields
     }
 
     // Validate the post data
-    if postRequest.Title == "" || postRequest.Content == "" {
+    if title == "" || content == "" {
         return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
             "error": "Title and content are required",
         })
     }
 
-    // Create the post with the user ID from the token
+    if files := form.File["pictures"]; len(files) > 0 {
+        pictures = make([]string, 0, len(files))
+
+        if len(files) > 5 {
+            return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+                "error": "Attachment upload limit exceeded (max 5 files)",
+            })
+        }
+
+        uploadsDir := "./static/uploads/attached_pictures"
+
+        for _, file := range files {
+            // Check file size
+            if file.Size > 5*1024*1024 {
+                continue
+            }
+
+            // Check file type
+            fileContentType := file.Header.Get("Content-Type")
+            if fileContentType != "image/jpeg" && fileContentType != "image/png" && fileContentType != "image/webp" {
+                continue
+            }
+
+            // Generate unique filename
+            filename := fmt.Sprintf("%d_%s", userID, uuid.New().String())
+            fileExt := filepath.Ext(file.Filename)
+            if fileExt == "" {
+                // Default extension based on content type
+                if fileContentType == "image/jpeg" {
+                    fileExt = ".jpg"
+                } else if fileContentType == "image/png" {
+                    fileExt = ".png"
+                } else {
+                    fileExt = ".webp"
+                }
+            }
+            filename = filename + fileExt
+            filePath := filepath.Join(uploadsDir, filename)
+            
+            // Save the file
+            if err := c.SaveFile(file, filePath); err != nil {
+                log.Printf("Error saving file: %v", err)
+                continue // Skip this file but continue with others
+            }
+
+            // Generate URL path for the picture
+            pictureURL := fmt.Sprintf("/static/uploads/attached_pictures/%s", filename)
+            pictures = append(pictures, pictureURL)
+        }
+    }
+
+    // Create the post with all collected data
     post := models.Post{
-        Title:   postRequest.Title,
-        Content: postRequest.Content,
-        Tags:    postRequest.Tags,
-        UserID:  userID,
+        Title:    title,
+        Content:  content,
+        Tags:     tags,
+        Pictures: pictures,
+        UserID:   userID,
     }
 
     // Create the post in the database
@@ -69,16 +136,18 @@ func CreatePost(c *fiber.Ctx) error {
         "id":             post.ID,
         "title":          post.Title,
         "content":        post.Content,
+        "pictures":       post.Pictures,
         "tags":           post.Tags,
         "created_at":     post.CreatedAt,
         "updated_at":     post.UpdatedAt,
-        "comment_count":  len(post.Comments),
+        "comment_count":  0,
         "is_metoo":       false,
         "metoo_count":    0,
         "is_watchlisted": false,
         "user": fiber.Map{
             "id":       user.ID,
             "username": user.Username,
+            "profile_picture_url": user.ProfilePictureURL,
         },
     }
 
@@ -87,22 +156,146 @@ func CreatePost(c *fiber.Ctx) error {
 
 // DeletePost handles the deletion of a post
 func DeletePost(c *fiber.Ctx) error {
-    // Get user ID from the JWT token
-    var userID uint
-    if userIDFloat, ok := c.Locals("user_id").(float64); ok {
-        userID = uint(userIDFloat)
-    } else {
-        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-            "error": "Unauthorized or invalid token",
+    // Get post ID from URL parameter
+    postID, err := c.ParamsInt("post_id")
+    if err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Invalid post ID",
         })
     }
-
+    
+    // Get user ID from JWT token
+    userIDFloat, ok := c.Locals("user_id").(float64)
+    if !ok {
+        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+            "error": "Unauthorized",
+        })
+    }
+    userID := uint(userIDFloat)
+    
+    // Get user role
     var user models.User
     if err := database.DB.First(&user, userID).Error; err != nil {
         return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-            "error": "Failed to retrieve user data",
+            "error": "Failed to retrieve user",
         })
     }
+    
+    // Check if post exists and user is authorized to delete it
+    var post models.Post
+    if err := database.DB.First(&post, postID).Error; err != nil {
+        if err == gorm.ErrRecordNotFound {
+            return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+                "error": "Post not found",
+            })
+        }
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to find post",
+        })
+    }
+    
+    // Check if user is authorized to delete the post (owner or admin/moderator)
+    if post.UserID != userID && user.Role != "admin" && user.Role != "moderator" {
+        return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+            "error": "You are not authorized to delete this post",
+        })
+    }
+    
+    // Use a transaction for atomicity and to ensure proper order of operations
+    tx := database.DB.Begin()
+    if tx.Error != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to start transaction",
+        })
+    }
+    
+    // Defer transaction rollback in case anything fails
+    defer func() {
+        if r := recover(); r != nil {
+            tx.Rollback()
+        }
+    }()
+    
+    // 1. Delete metoo entries - must do this FIRST because of foreign key constraint
+    if err := tx.Where("post_id = ?", postID).Delete(&models.MeToo{}).Error; err != nil {
+        tx.Rollback()
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to delete metoo entries: " + err.Error(),
+        })
+    }
+    
+    // 2. Delete watchlist entries
+    if err := tx.Where("post_id = ?", postID).Delete(&models.UserWatchlist{}).Error; err != nil {
+        tx.Rollback()
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to delete watchlist entries: " + err.Error(),
+        })
+    }
+    
+    // 3. Get all comment IDs for this post
+    var commentIDs []uint
+    if err := tx.Model(&models.Comment{}).Where("post_id = ?", postID).Pluck("id", &commentIDs).Error; err != nil {
+        tx.Rollback()
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to fetch comment IDs: " + err.Error(),
+        })
+    }
+    
+    // 4. Delete reactions for these comments
+    if len(commentIDs) > 0 {
+        if err := tx.Where("comment_id IN ?", commentIDs).Delete(&models.Reaction{}).Error; err != nil {
+            tx.Rollback()
+            return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+                "error": "Failed to delete comment reactions: " + err.Error(),
+            })
+        }
+    }
+    
+    // 5. Delete all comments
+    if err := tx.Where("post_id = ?", postID).Delete(&models.Comment{}).Error; err != nil {
+        tx.Rollback()
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to delete comments: " + err.Error(),
+        })
+    }
+
+    // 6. Delete all pictures from the filesystem
+    for _, picture := range post.Pictures {
+        filePath := fmt.Sprintf("./static/uploads/attached_pictures/%s", filepath.Base(picture))
+        if err := os.Remove(filePath); err != nil {
+            log.Printf("Error deleting file %s: %v", filePath, err)
+        }
+    }
+    
+    // 7. Finally, delete the post
+    if err := tx.Delete(&post).Error; err != nil {
+        tx.Rollback()
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to delete post: " + err.Error(),
+        })
+    }
+    
+    // Commit the transaction
+    if err := tx.Commit().Error; err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to commit transaction: " + err.Error(),
+        })
+    }
+    
+    return c.Status(fiber.StatusOK).JSON(fiber.Map{
+        "message": "Post deleted successfully",
+    })
+}
+
+func DeletePostPicture(c *fiber.Ctx) error {
+    // Get user ID from JWT token
+    userIDFloat, ok := c.Locals("user_id").(float64)
+    if !ok {
+        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+            "error": "Unauthorized",
+        })
+    }
+    userID := uint(userIDFloat)
 
     // Get post ID from URL parameter
     postID, err := c.ParamsInt("post_id")
@@ -112,7 +305,15 @@ func DeletePost(c *fiber.Ctx) error {
         })
     }
 
-    // Check if post exists
+    // Get picture URL from query parameter
+    pictureURL := c.Params("picture_url")
+    if pictureURL == "" {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Picture URL is required",
+        })
+    }
+
+    // Check if the post exists
     var post models.Post
     if err := database.DB.First(&post, postID).Error; err != nil {
         if err == gorm.ErrRecordNotFound {
@@ -125,23 +326,45 @@ func DeletePost(c *fiber.Ctx) error {
         })
     }
 
-    // Check if the user is the author of the post
-    // Admins and moderators can delete any post
-    if post.UserID != userID && user.Role != "admin" && user.Role != "moderator" {
-        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-            "error": "You are not the author of this post",
+    // Check if the user is authorized to delete the picture
+    if post.UserID != userID {
+        var user models.User
+        if err := database.DB.First(&user, userID).Error; err != nil {
+            return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+                "error": "Failed to retrieve user",
+            })
+        }
+        if user.Role != "admin" && user.Role != "moderator" {
+            return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+                "error": "You are not authorized to delete this picture",
+            })
+        }
+    }
+
+    // Remove the picture from the post's Pictures slice
+    for i, pic := range post.Pictures {
+        if filepath.Base(pic) == pictureURL {
+            post.Pictures = append(post.Pictures[:i], post.Pictures[i+1:]...)
+            break
+        }
+    }
+
+    // Update the post in the database
+    if err := database.DB.Save(&post).Error; err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to update post",
         })
     }
 
-    // Delete the post
-    if err := database.DB.Delete(&post).Error; err != nil {
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-            "error": "Failed to delete post",
-        })
+    // Delete the picture file from the filesystem
+    filePath := fmt.Sprintf("./static/uploads/attached_pictures/%s", filepath.Base(pictureURL))
+    if err := os.Remove(filePath); err != nil {
+        log.Printf("Error deleting file %s: %v", filePath, err)
     }
 
     return c.JSON(fiber.Map{
-        "message": "Post deleted successfully",
+        "id":       post.ID,
+        "pictures": post.Pictures,
     })
 }
 
@@ -190,9 +413,9 @@ func GetPost(c *fiber.Ctx) error {
         isMetoo = database.DB.Where("post_id = ? AND user_id = ?", post.ID, userID).First(&meTooEntry).Error == nil
         
         // Check if current user has watchlisted this post
-        var watchCount int64
-        database.DB.Table("user_watchlist").Where("user_id = ? AND post_id = ?", userID, post.ID).Count(&watchCount)
-        isWatchlisted = watchCount > 0
+        var watchlistEntry models.UserWatchlist
+        isWatchlisted = database.DB.Where("post_id = ? AND user_id = ?", post.ID, userID).
+            First(&watchlistEntry).Error == nil
     }
 
     // Format comments to needs
@@ -246,6 +469,7 @@ func GetPost(c *fiber.Ctx) error {
         "title":          post.Title,
         "content":        post.Content,
         "solution":       nil,
+        "pictures":       post.Pictures,
         "tags":           post.Tags,
         "created_at":     post.CreatedAt,
         "updated_at":     post.UpdatedAt,
@@ -523,17 +747,10 @@ func GetPosts(c *fiber.Ctx) error {
             }
             
             // Check user's watchlist
-            type WatchlistItem struct {
-                PostID uint
-            }
-            var watchlistItems []WatchlistItem
-            database.DB.Table("user_watchlist").
-                Select("post_id").
-                Where("user_id = ? AND post_id IN ?", userID, postIDs).
-                Scan(&watchlistItems)
-                
-            for _, item := range watchlistItems {
-                userWatchlistMap[item.PostID] = true
+            var userWatchlist []models.UserWatchlist
+            database.DB.Where("user_id = ? AND post_id IN ?", userID, postIDs).Find(&userWatchlist)
+            for _, watchlist := range userWatchlist {
+                userWatchlistMap[watchlist.PostID] = true
             }
         }
         
@@ -582,6 +799,7 @@ func GetPosts(c *fiber.Ctx) error {
                 "title":          post.Title,
                 "content":        post.Content,
                 "solution":       nil,
+                "pictures":       post.Pictures,
                 "tags":           post.Tags,
                 "created_at":     post.CreatedAt,
                 "updated_at":     post.UpdatedAt,
@@ -697,10 +915,9 @@ func GetUserPosts(c *fiber.Ctx) error {
                 First(&meTooEntry).Error == nil
             
             // Check watchlist
-            var watchCount int64
-            database.DB.Table("user_watchlist").Where("user_id = ? AND post_id = ?", currentUserID, post.ID).
-                Count(&watchCount)
-            isWatchlisted = watchCount > 0
+            var watchlistEntry models.UserWatchlist
+            isWatchlisted = database.DB.Where("post_id = ? AND user_id = ?", post.ID, currentUserID).
+                First(&watchlistEntry).Error == nil
         }
         
         // Build post data
@@ -708,6 +925,7 @@ func GetUserPosts(c *fiber.Ctx) error {
             "id":             post.ID,
             "title":          post.Title,
             "content":        post.Content,
+            "pictures":       post.Pictures,
             "solution":       nil,
             "tags":           post.Tags,
             "created_at":     post.CreatedAt,
@@ -864,44 +1082,40 @@ func ToggleWatchlist(c *fiber.Ctx) error {
         })
     }
 
-    // Get the current user with their watchlist
-    var user models.User
-    if err := database.DB.Preload("Watchlist").First(&user, userID).Error; err != nil {
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-            "error": "Failed to fetch user data",
-        })
-    }
+    // Check if watchlist entry already exists
+    var watchlistEntry models.UserWatchlist
+    result := database.DB.Where("post_id = ? AND user_id = ?", postID, userID).First(&watchlistEntry)
 
-    // Check if post is already in watchlist
-    isWatchlisted := false
-    for _, watchedPost := range user.Watchlist {
-        if watchedPost.ID == uint(postID) {
-            isWatchlisted = true
-            break
-        }
-    }
-
-    if isWatchlisted {
-        // Post is already in watchlist, so remove it
-        if err := database.DB.Model(&user).Association("Watchlist").Delete(&post); err != nil {
+    if result.Error == nil {
+        // Watchlist entry exists, so remove it
+        if err := database.DB.Delete(&watchlistEntry).Error; err != nil {
             return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-                "error": "Failed to remove post from watchlist",
+                "error": "Failed to remove from watchlist",
             })
         }
         return c.JSON(fiber.Map{
             "id":             postID,
             "is_watchlisted": false,
         })
-    } else {
-        // Post is not in watchlist, so add it
-        if err := database.DB.Model(&user).Association("Watchlist").Append(&post); err != nil {
+    } else if result.Error == gorm.ErrRecordNotFound {
+        // Watchlist entry doesn't exist, so create it
+        newWatchlistEntry := models.UserWatchlist{
+            PostID: uint(postID),
+            UserID: userID,
+        }
+        if err := database.DB.Create(&newWatchlistEntry).Error; err != nil {
             return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-                "error": "Failed to add post to watchlist",
+                "error": "Failed to add to watchlist",
             })
         }
         return c.JSON(fiber.Map{
             "id":             postID,
             "is_watchlisted": true,
+        })
+    } else {
+        // Some other database error
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Database error: " + result.Error.Error(),
         })
     }
 }

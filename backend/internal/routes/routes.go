@@ -21,6 +21,7 @@ func SetupRoutes(app *fiber.App) {
 
     app.Post("/posts", middleware.JWTProtected(), handlers.CreatePost)
     app.Delete("/posts/:post_id", middleware.JWTProtected(), handlers.DeletePost)
+    app.Delete("/posts/:post_id/picture/:picture_url", middleware.JWTProtected(), handlers.DeletePostPicture)
     app.Get("/posts", middleware.OptionalAuth(), handlers.GetPosts)
     app.Get("/posts/:post_id", middleware.OptionalAuth(), handlers.GetPost)
     app.Post("/posts/:post_id/metoo", middleware.JWTProtected(), handlers.ToggleMetoo)

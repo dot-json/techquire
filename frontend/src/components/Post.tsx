@@ -90,10 +90,10 @@ const Post = ({
         {title}
       </Link>
       {formattedPostContent}
-      <div className={cn("flex items-center gap-1 text-text-500")}>
+      <div className={cn("flex flex-wrap items-center gap-1 text-text-500")}>
         <p>Posted at</p>
         <p>{new Date(created_at).toLocaleString("en-US")}</p>
-        <p className={cn("mx-1")}>|</p>
+        <p className={cn("mx-1 hidden sm:static")}>|</p>
         <p>
           By{" "}
           <Link
@@ -131,26 +131,21 @@ const Post = ({
                   alt="profile_pic"
                   className={cn("size-12 rounded-full border sm:size-12")}
                 />
-                <h1 className={cn("font-medium sm:text-base")}>
-                  {solution.user.username}
-                </h1>
+                <Link
+                  to={`/profile/${solution.user.username}`}
+                  className={cn(
+                    "rounded-sm px-0.5 underline decoration-transparent underline-offset-2 outline-none transition-colors hover:decoration-text-100 focus-visible:ring-2 focus-visible:ring-text-500",
+                  )}
+                >
+                  <h1 className={cn("font-medium sm:text-base")}>
+                    {solution.user.username}
+                  </h1>
+                </Link>
               </div>
               {formattedSolutionContent}
               <div className={cn("flex items-center gap-1 text-text-500")}>
                 <p>Posted at</p>
                 <p>{new Date(solution.created_at).toLocaleString("en-US")}</p>
-                <p className={cn("mx-1")}>|</p>
-                <p>
-                  By{" "}
-                  <Link
-                    to={`/profile/${solution.user.username}`}
-                    className={cn(
-                      "rounded-sm px-0.5 underline decoration-transparent underline-offset-2 outline-none hover:decoration-text-500 focus-visible:ring-2 focus-visible:ring-text-500",
-                    )}
-                  >
-                    {solution.user.username}
-                  </Link>
-                </p>
               </div>
             </div>
           </div>

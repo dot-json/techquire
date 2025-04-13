@@ -206,13 +206,29 @@ func SeedWatchlist() {
     DB.Find(&posts)
 
     for _, user := range users {
+        // Create 0-4 random watchlist entries for each user
         for j := 0; j < rand.Intn(5); j++ {
             post := posts[rand.Intn(len(posts))]
             if post.UserID == user.ID {
                 continue // Skip if the post is created by the user
             }
-            if err := DB.Model(&user).Association("Watchlist").Append(&post); err != nil {
-                log.Printf("Error adding post to watchlist: %v", err)
+            
+            // Create watchlist entry directly instead of using Association
+            watchlistEntry := models.UserWatchlist{
+                UserID:    user.ID,
+                PostID:    post.ID,
+            }
+            
+            // Check if entry already exists (avoid duplicates)
+            var existingEntry models.UserWatchlist
+            if err := DB.Where("user_id = ? AND post_id = ?", user.ID, post.ID).First(&existingEntry).Error; err == nil {
+                // Entry already exists, skip
+                continue
+            }
+            
+            // Create the entry directly
+            if err := DB.Create(&watchlistEntry).Error; err != nil {
+                log.Printf("Error creating watchlist entry: %v", err)
                 continue
             }
         }

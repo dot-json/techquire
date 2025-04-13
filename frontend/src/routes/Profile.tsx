@@ -15,8 +15,11 @@ import {
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useParams } from "react-router";
+import { useNavigate } from "react-router";
+import { toast } from "react-toastify";
 
 const Profile = () => {
+  const navigate = useNavigate();
   const { handle } = useParams();
   const [profileData, setProfileData] = useState<ProfileData>();
   const dispatch = useDispatch<AppDispatch>();
@@ -27,10 +30,13 @@ const Profile = () => {
 
   useEffect(() => {
     const fetchProfileData = async () => {
-      const res = await axios.get(
-        `${import.meta.env.VITE_SERVICE_URL}/users/${handle}`,
-      );
-      setProfileData(res.data);
+      await axios
+        .get(`${import.meta.env.VITE_SERVICE_URL}/users/${handle}`)
+        .then((res) => setProfileData(res.data))
+        .catch((err) => {
+          toast.error(err.response.data.error);
+          navigate("/feed");
+        });
     };
 
     fetchProfileData();
@@ -52,6 +58,31 @@ const Profile = () => {
     }
   };
 
+  const handleUpadteUserRole = async (new_role: "moderator" | "user") => {
+    if (!profileData) return;
+    await axios
+      .put(
+        `${import.meta.env.VITE_SERVICE_URL}/users/update-role`,
+        { user_id: profileData?.id, role: new_role },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          responseType: "json",
+        },
+      )
+      .then((res) => {
+        setProfileData((prev) => {
+          if (!prev) return prev;
+          return { ...prev, role: new_role };
+        });
+        toast.success(res.data.message);
+      })
+      .catch((err) => {
+        toast.error(err.response.data.error);
+      });
+  };
   if (!profileData) {
     return (
       <div
@@ -71,7 +102,7 @@ const Profile = () => {
           "flex flex-col gap-4 rounded-xl border border-background-600 bg-background-900 p-4 sm:top-[calc(3.5rem-1px)] sm:gap-8 sm:p-6",
         )}
       >
-        <div className={cn("flex items-center gap-4")}>
+        <div className={cn("grid grid-cols-[auto_1fr_auto] gap-4")}>
           <img
             src={
               profileData.profile_picture_url
@@ -81,9 +112,38 @@ const Profile = () => {
             alt="profile_pic"
             className={cn("size-16 rounded-full border sm:size-24")}
           />
-          <h1 className={cn("text-xl font-semibold sm:text-3xl")}>
-            {profileData.username}
-          </h1>
+          <div className={cn("flex flex-col self-center")}>
+            <h1 className={cn("text-xl font-semibold sm:text-3xl")}>
+              {profileData.username}
+            </h1>
+            <p
+              className={cn(
+                "uppercase text-text-400",
+                profileData.role === "moderator" && "text-info",
+                profileData.role === "admin" && "text-error",
+              )}
+            >
+              {profileData.role}
+            </p>
+          </div>
+          {profileData.role === "user" && (
+            <Button
+              size="sm"
+              className={cn("h-fit justify-self-end")}
+              onClick={() => handleUpadteUserRole("moderator")}
+            >
+              Set moderator
+            </Button>
+          )}
+          {profileData.role === "moderator" && (
+            <Button
+              size="sm"
+              className={cn("h-fit justify-self-end")}
+              onClick={() => handleUpadteUserRole("user")}
+            >
+              Set user
+            </Button>
+          )}
         </div>
         <hr className={cn("border-t-background-600")} />
         <div className={cn("grid grid-flow-col gap-12 sm:w-fit")}>

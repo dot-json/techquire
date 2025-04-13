@@ -15,7 +15,9 @@ type User struct {
     NumberOfSolutions int        `gorm:"default:0"` // Number of solutions provided by the user
     CreatedAt         time.Time
     UpdatedAt         time.Time
+    
     Posts             []Post     `gorm:"foreignKey:UserID"` // One-to-many relationship with Post
     Comments          []Comment  `gorm:"foreignKey:UserID"` // One-to-many relationship with Comment
     Watchlist         []Post     `gorm:"many2many:user_watchlist"` // Many-to-many relationship with Post for watchlist
+    MeTooPosts        []Post     `gorm:"many2many:me_toos;joinForeignKey:UserID;joinReferences:PostID"` // Many-to-many for metoos
 }

@@ -1,7 +1,7 @@
 import { AppDispatch, RootState } from "@/lib/store";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link, Navigate, useParams } from "react-router";
+import { Link, Navigate, useNavigate, useParams } from "react-router";
 import { cn } from "@/lib/utils";
 import {
   Check,
@@ -20,6 +20,8 @@ import { Button } from "@/components/atoms/Button";
 import {
   createComment,
   deleteComment,
+  deletePost,
+  deletePostPicture,
   fetchPost,
   react,
   toggleMarkAsSolution,
@@ -27,6 +29,8 @@ import {
   toggleWatchlist,
 } from "@/lib/slices/postSlice";
 import { Textarea } from "@/components/atoms/Textarea";
+import { Dialog, DialogContent, DialogHeader } from "@/components/atoms/Dialog";
+import { DialogDescription, DialogTitle } from "@radix-ui/react-dialog";
 
 const formatContentWithCodeBlocks = (content: string) => {
   const codeBlockRegex = /```([\w]*)\n([\s\S]*?)```/g;
@@ -67,6 +71,7 @@ const formatContentWithCodeBlocks = (content: string) => {
 
 const OpenedPost = () => {
   const { post_id: postIdParam } = useParams();
+  const navigate = useNavigate();
   const post_id = postIdParam ? parseInt(postIdParam) : NaN;
   const dispatch = useDispatch<AppDispatch>();
   const { id, role, token, profile_picture_url } = useSelector(
@@ -76,6 +81,14 @@ const OpenedPost = () => {
   const [newComment, setNewComment] = useState({ content: "" });
   const [isCommenting, setIsCommenting] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false);
+  const [imagePreview, setImagePreview] = useState<{
+    url: string;
+    open: Boolean;
+  }>({
+    url: "",
+    open: false,
+  });
 
   if (isNaN(post_id)) {
     return <Navigate to="/feed" />;
@@ -99,6 +112,19 @@ const OpenedPost = () => {
 
   const handleDeleteComment = (comment_id: number) => {
     dispatch(deleteComment({ token, post_id, comment_id }));
+  };
+
+  const handleDeletePost = () => {
+    dispatch(deletePost({ token, post_id: post_id })).then((res) => {
+      if (res.meta.requestStatus === "fulfilled") {
+        setDeleteConfirmationOpen(false);
+        navigate("/feed");
+      }
+    });
+  };
+
+  const handleDeletePostImage = (picture_url: string) => {
+    dispatch(deletePostPicture({ token, post_id, picture_url }));
   };
 
   const handleSubmitComment = (e: React.FormEvent<HTMLFormElement>) => {
@@ -139,6 +165,18 @@ const OpenedPost = () => {
     );
   }
 
+  if (posts.length === 0) {
+    return (
+      <div
+        className={cn(
+          "z-[771] grid size-full flex-1 place-items-center bg-background-950",
+        )}
+      >
+        <p className={cn("text-text-200")}>No posts found</p>
+      </div>
+    );
+  }
+
   const formattedPostContent = formatContentWithCodeBlocks(posts[0].content);
   const formattedSolutionContent = posts[0].solution
     ? formatContentWithCodeBlocks(posts[0].solution.content)
@@ -147,7 +185,7 @@ const OpenedPost = () => {
   return (
     <div
       className={cn(
-        "my-4 grid flex-1 grid-flow-row grid-cols-1 gap-4 lg:my-0 lg:grid-flow-col lg:grid-cols-4",
+        "my-4 grid grid-flow-row grid-cols-1 gap-4 lg:my-0 lg:flex-1 lg:grid-flow-col lg:grid-cols-4",
       )}
     >
       <aside
@@ -221,8 +259,83 @@ const OpenedPost = () => {
           "flex h-fit flex-col gap-4 rounded-lg border border-background-600/75 bg-background-900 p-4 lg:col-span-3 lg:my-8",
         )}
       >
-        <h1 className={cn("text-2xl")}>{posts[0].title}</h1>
+        <div className={cn("flex items-start justify-between gap-4")}>
+          <h1 className={cn("text-2xl")}>{posts[0].title}</h1>
+          {(role === "moderator" ||
+            role === "admin" ||
+            id === posts[0].user.id) && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setDeleteConfirmationOpen(true)}
+              className={cn("text-error hover:bg-error/25 active:bg-error/40")}
+            >
+              <Trash2 size={18} />
+            </Button>
+          )}
+        </div>
         {formattedPostContent}
+        {posts[0].pictures && posts[0].pictures.length > 0 && (
+          <div className={cn("flex flex-col gap-2")}>
+            <h3 className={cn("text-lg text-text-400")}>Pictures</h3>
+            <div className={cn("flex flex-wrap gap-4")}>
+              {posts[0].pictures.map((picture, id) => (
+                <div
+                  key={id}
+                  className={cn(
+                    "flex items-center gap-2 rounded-md border border-background-600 bg-background-800 p-2",
+                  )}
+                >
+                  {picture && (
+                    <img
+                      src={`${import.meta.env.VITE_SERVICE_URL}${picture}`}
+                      alt="post_attachment"
+                      className={cn("size-10 cursor-pointer rounded-md")}
+                      onClick={() =>
+                        setImagePreview({ url: picture, open: true })
+                      }
+                    />
+                  )}
+                  {(role === "admin" || role === "moderator") && (
+                    <Button
+                      size={"icon"}
+                      variant="ghost"
+                      className={cn(
+                        "text-error hover:bg-error/25 active:bg-error/40",
+                      )}
+                      onClick={() =>
+                        handleDeletePostImage(picture.split("/").pop()!)
+                      }
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div
+              className={cn(
+                "fixed left-0 top-0 z-[771] grid size-full place-items-center bg-background-950/50 p-4 backdrop-blur-sm transition-opacity",
+                imagePreview.open === false && "pointer-events-none opacity-0",
+              )}
+            >
+              {imagePreview.url && (
+                <img
+                  src={`${import.meta.env.VITE_SERVICE_URL}${imagePreview.url}`}
+                  alt="post attachment"
+                />
+              )}
+              <button
+                onClick={() =>
+                  setImagePreview((prev) => ({ ...prev, open: false }))
+                }
+                className={cn("self-start justify-self-end [grid-area:1/1]")}
+              >
+                <X size={32} />
+              </button>
+            </div>
+          </div>
+        )}
         <hr className={cn("border-t-background-600")} />
         {posts[0].solution && (
           <>
@@ -265,29 +378,28 @@ const OpenedPost = () => {
                     alt="profile_pic"
                     className={cn("size-12 rounded-full border sm:size-12")}
                   />
-                  <h1 className={cn("font-medium sm:text-base")}>
-                    {posts[0].solution.user.username}
-                  </h1>
+                  <Link
+                    to={`/profile/${posts[0].solution.user.username}`}
+                    className={cn(
+                      "rounded-sm px-0.5 underline decoration-transparent underline-offset-2 outline-none transition-colors hover:decoration-text-100 focus-visible:ring-2 focus-visible:ring-text-500",
+                    )}
+                  >
+                    <h1 className={cn("font-medium sm:text-base")}>
+                      {posts[0].solution.user.username}
+                    </h1>
+                  </Link>
                 </div>
                 {formattedSolutionContent}
-                <div className={cn("flex items-center gap-1 text-text-500")}>
+                <div
+                  className={cn(
+                    "flex flex-wrap items-center gap-1 text-text-500",
+                  )}
+                >
                   <p>Posted at</p>
                   <p>
                     {new Date(posts[0].solution.created_at).toLocaleString(
                       "en-US",
                     )}
-                  </p>
-                  <p className={cn("mx-1")}>|</p>
-                  <p>
-                    By{" "}
-                    <Link
-                      to={`/profile/${posts[0].solution.user.username}`}
-                      className={cn(
-                        "rounded-sm px-0.5 underline decoration-transparent underline-offset-2 outline-none hover:decoration-text-500 focus-visible:ring-2 focus-visible:ring-text-500",
-                      )}
-                    >
-                      {posts[0].solution.user.username}
-                    </Link>
                   </p>
                 </div>
               </div>
@@ -297,48 +409,50 @@ const OpenedPost = () => {
         )}
         <div className={cn("flex flex-col gap-4")}>
           <h2 className={cn("text-xl")}>{posts[0].comment_count} Comments</h2>
-          <div className={cn("grid grid-cols-[auto_1fr] gap-4")}>
-            <img
-              src={
-                profile_picture_url
-                  ? `${import.meta.env.VITE_SERVICE_URL}${profile_picture_url}`
-                  : "https://www.gravatar.com/avatar/?d=identicon&s=400"
-              }
-              alt="profile_pic"
-              className={cn("size-12 rounded-full border")}
-            />
-            <form
-              onSubmit={handleSubmitComment}
-              className={cn("flex flex-col gap-2")}
-            >
-              <Textarea
-                placeholder={"Write a comment..."}
-                onChange={(e) =>
-                  setNewComment({ ...newComment, content: e.target.value })
+          {token !== "" && (
+            <div className={cn("grid grid-cols-[auto_1fr] gap-4")}>
+              <img
+                src={
+                  profile_picture_url
+                    ? `${import.meta.env.VITE_SERVICE_URL}${profile_picture_url}`
+                    : "https://www.gravatar.com/avatar/?d=identicon&s=400"
                 }
-                onClick={() => setIsCommenting(true)}
-                value={newComment.content}
-                className={cn("min-h-0")}
+                alt="profile_pic"
+                className={cn("size-12 rounded-full border")}
               />
-              {isCommenting && (
-                <div className={cn("flex items-center gap-2 self-end")}>
-                  <Button
-                    size="sm"
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setIsCommenting(false)}
-                  >
-                    <X size={16} />
-                    Cancel
-                  </Button>
-                  <Button size="sm" type="submit">
-                    <Send size={14} />
-                    Post
-                  </Button>
-                </div>
-              )}
-            </form>
-          </div>
+              <form
+                onSubmit={handleSubmitComment}
+                className={cn("flex flex-col gap-2")}
+              >
+                <Textarea
+                  placeholder={"Write a comment..."}
+                  onChange={(e) =>
+                    setNewComment({ ...newComment, content: e.target.value })
+                  }
+                  onClick={() => setIsCommenting(true)}
+                  value={newComment.content}
+                  className={cn("min-h-0")}
+                />
+                {isCommenting && (
+                  <div className={cn("flex items-center gap-2 self-end")}>
+                    <Button
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setIsCommenting(false)}
+                    >
+                      <X size={16} />
+                      Cancel
+                    </Button>
+                    <Button size="sm" type="submit">
+                      <Send size={14} />
+                      Post
+                    </Button>
+                  </div>
+                )}
+              </form>
+            </div>
+          )}
           {posts[0].comments?.map((comment) => (
             <div
               key={comment.id}
@@ -393,21 +507,23 @@ const OpenedPost = () => {
                     <ThumbsDown size={16} />
                     {comment.dislike_count}
                   </Button>
-                  {posts[0].solution === null && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={cn(
-                        "px-2 text-sm",
-                        comment.is_solution &&
-                          "bg-success/50 hover:bg-success/40 active:bg-success/60",
-                      )}
-                      onClick={() => handleToggleSolution(comment.id)}
-                    >
-                      <Check size={16} />
-                      Mark as Solution
-                    </Button>
-                  )}
+                  {posts[0].solution === null &&
+                    token !== "" &&
+                    id === posts[0].user.id && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={cn(
+                          "px-2 text-sm",
+                          comment.is_solution &&
+                            "bg-success/50 hover:bg-success/40 active:bg-success/60",
+                        )}
+                        onClick={() => handleToggleSolution(comment.id)}
+                      >
+                        <Check size={16} />
+                        Mark as Solution
+                      </Button>
+                    )}
                 </div>
               </div>
               {(id === comment.user.id ||
@@ -428,6 +544,37 @@ const OpenedPost = () => {
           ))}
         </div>
       </div>
+      <Dialog
+        open={deleteConfirmationOpen}
+        onOpenChange={setDeleteConfirmationOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Post</DialogTitle>
+            <DialogDescription className={cn("text-sm text-text-200")}>
+              Do you really want to delete this post?
+            </DialogDescription>
+          </DialogHeader>
+          <div className={cn("flex flex-col gap-4 sm:flex-row")}>
+            <div className={cn("mt-4 flex w-full items-center gap-4")}>
+              <Button
+                variant="destructive"
+                className={cn("w-full")}
+                onClick={handleDeletePost}
+              >
+                Delete
+              </Button>
+              <Button
+                variant="ghost"
+                className={cn("w-full")}
+                onClick={() => setDeleteConfirmationOpen(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -218,6 +218,34 @@ export const updateProfilePicture = createAsyncThunk(
   },
 );
 
+export const updateUserRole = createAsyncThunk(
+  "user/updateUserRole",
+  async (
+    { token, user_id, role }: { token: string; user_id: number; role: string },
+    { rejectWithValue },
+  ) => {
+    try {
+      const response = await axios.put(
+        `${import.meta.env.VITE_SERVICE_URL}/users/update-role`,
+        { user_id, role },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          responseType: "json",
+        },
+      );
+      return response.data;
+    } catch (error: any) {
+      if (!error.response) {
+        return rejectWithValue("Service is not available");
+      }
+      return rejectWithValue(error.response.data);
+    }
+  },
+);
+
 const userSlice = createSlice({
   name: "user",
   initialState,
@@ -227,7 +255,7 @@ const userSlice = createSlice({
       state.email = "";
       state.username = "";
       state.token = "";
-      Cookie.remove("user");
+      Cookie.remove("auth_token");
     },
   },
   extraReducers: (builder) => {

@@ -1,5 +1,6 @@
 import { Button } from "@/components/atoms/Button";
 import { Checkbox } from "@/components/atoms/Checkbox";
+import { Input } from "@/components/atoms/Input";
 import {
   Select,
   SelectContent,
@@ -45,6 +46,8 @@ const Feed = () => {
   const [sortBy, setSortBy] = useState<SortOption>("created_at_desc");
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
   const [isFilterChanged, setIsFilterChanged] = useState(false);
+  const [tags, setTags] = useState<string[]>(["tag1", "tag2", "tag3"]);
+  const [newTag, setNewTag] = useState("");
 
   // Load posts with current filters and sort
   const loadPosts = (page = 1, append = false) => {
@@ -69,12 +72,22 @@ const Feed = () => {
     dispatch(fetchPosts({ token, ...params }));
   };
 
-  // Handle checkbox changes
+  // Handle checkbox changes, dont let unsolved and solved be checked at the same time
   const handleFilterChange = (filterName: keyof FilterOptions) => {
-    setFilters((prev) => ({
-      ...prev,
-      [filterName]: !prev[filterName],
-    }));
+    setFilters((prev) => {
+      const newFilters = { ...prev, [filterName]: !prev[filterName] };
+
+      // If unsolved and solved are both checked, uncheck one of them
+      if (prev.solved && newFilters.unsolved) {
+        newFilters.unsolved = true;
+        newFilters.solved = false;
+      } else if (prev.unsolved && newFilters.solved) {
+        newFilters.solved = true;
+        newFilters.unsolved = false;
+      }
+
+      return newFilters;
+    });
   };
 
   // Handle sort changes
@@ -96,6 +109,13 @@ const Feed = () => {
   const handleLoadMore = () => {
     if (pagination.has_more) {
       loadPosts(pagination.page + 1, true);
+    }
+  };
+
+  const handleAddTag = () => {
+    if (newTag.trim() !== "") {
+      setTags((prev) => [...prev, newTag]);
+      setNewTag("");
     }
   };
 
@@ -136,47 +156,57 @@ const Feed = () => {
   }, [posts]);
 
   return (
-    <div className={cn("grid flex-1 grid-cols-4 gap-4")}>
+    <div
+      className={cn(
+        "grid flex-1 grid-cols-1 gap-4 py-4 lg:grid-cols-4 lg:py-8",
+      )}
+    >
       <aside
         className={cn(
-          "sticky top-[5.5rem] z-10 hidden h-fit flex-col gap-2 rounded-lg border border-background-600/75 bg-background-900 p-4 lg:flex",
+          "top-[5.5rem] z-10 flex h-fit flex-col gap-4 rounded-lg border border-background-600/75 bg-background-900 p-4 lg:sticky",
         )}
       >
-        <div className="flex items-center justify-between">
-          <h2 className={cn("text-lg text-text-200")}>Filters</h2>
-          {activeFiltersCount > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={resetFilters}
-              className="h-6 px-2 text-xs text-text-400 hover:text-text-100"
-            >
-              <X className="mr-1 h-3 w-3" />
-              Reset
-            </Button>
-          )}
-        </div>
-        <div className={cn("flex flex-col gap-2 px-2")}>
-          <Checkbox
-            label="Me toos"
-            checked={filters.metoos}
-            onCheckedChange={() => handleFilterChange("metoos")}
-          />
-          <Checkbox
-            label="Watchlisted"
-            checked={filters.watchlisted}
-            onCheckedChange={() => handleFilterChange("watchlisted")}
-          />
-          <Checkbox
-            label="Solved"
-            checked={filters.solved}
-            onCheckedChange={() => handleFilterChange("solved")}
-          />
-          <Checkbox
-            label="Unsolved"
-            checked={filters.unsolved}
-            onCheckedChange={() => handleFilterChange("unsolved")}
-          />
+        <div className={cn("flex flex-col gap-2")}>
+          <div className={cn("flex items-center justify-between")}>
+            <h2 className={cn("text-lg text-text-200")}>Filters</h2>
+            {activeFiltersCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetFilters}
+                className="h-6 px-2 text-xs text-text-400 hover:text-text-100"
+              >
+                <X className="mr-1 h-3 w-3" />
+                Reset
+              </Button>
+            )}
+          </div>
+          <div className={cn("flex flex-col gap-2 px-2")}>
+            {token !== "" && (
+              <>
+                <Checkbox
+                  label="Me toos"
+                  checked={filters.metoos}
+                  onCheckedChange={() => handleFilterChange("metoos")}
+                />
+                <Checkbox
+                  label="Watchlisted"
+                  checked={filters.watchlisted}
+                  onCheckedChange={() => handleFilterChange("watchlisted")}
+                />
+              </>
+            )}
+            <Checkbox
+              label="Solved"
+              checked={filters.solved}
+              onCheckedChange={() => handleFilterChange("solved")}
+            />
+            <Checkbox
+              label="Unsolved"
+              checked={filters.unsolved}
+              onCheckedChange={() => handleFilterChange("unsolved")}
+            />
+          </div>
         </div>
         <div className={cn("flex flex-col gap-2")}>
           <h2 className={cn("text-lg text-text-200")}>Sorting</h2>
@@ -194,10 +224,59 @@ const Feed = () => {
             </SelectContent>
           </Select>
         </div>
+        <div className={cn("flex flex-col gap-2")}>
+          <h2 className={cn("text-lg text-text-200")}>Tags</h2>
+          <div className={cn("flex items-center gap-2")}>
+            <Input
+              size={12}
+              value={newTag}
+              onChange={(e) => setNewTag(e.target.value)}
+              placeholder="Add a tag"
+              className={cn("w-full")}
+            />
+            <Button
+              variant="neutral"
+              size="sm"
+              onClick={handleAddTag}
+              className={cn(
+                "h-10 border-none bg-background-700 hover:bg-background-600 active:bg-background-500",
+              )}
+            >
+              Add
+            </Button>
+          </div>
+          <div
+            className={cn(
+              "mt-2 flex flex-wrap gap-2",
+              tags.length === 0 && "hidden",
+            )}
+          >
+            {tags.map((tag, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "flex h-8 select-none items-center gap-1 rounded-md bg-background-700 px-2 py-1 pl-3 text-sm font-semibold text-text-100",
+                )}
+              >
+                {`#${tag}`}
+                <button
+                  onClick={() => {
+                    setTags((prev) => prev.filter((_, index) => index !== i));
+                  }}
+                  className={cn(
+                    "rounded-md outline-none focus-visible:ring-2 focus-visible:ring-background-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background-600",
+                  )}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
       </aside>
-      <div className={cn("col-span-full py-4 sm:py-8 lg:col-span-3")}>
+      <div className={cn("col-span-full lg:col-span-3")}>
         <div className={cn("flex flex-col gap-4")}>
-          <CreatePost />
+          {token !== "" && <CreatePost />}
           {posts.map((post, i) => (
             <Post
               key={i}

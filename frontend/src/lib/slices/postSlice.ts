@@ -87,7 +87,9 @@ export const fetchPosts = createAsyncThunk(
       };
     } catch (error: any) {
       if (!error.response) {
-        return rejectWithValue("Service is not available");
+        return rejectWithValue({
+          error: { error: "Service is not available" },
+        });
       }
       return rejectWithValue(error.response.data);
     }
@@ -113,7 +115,7 @@ export const fetchPost = createAsyncThunk(
       return response.data;
     } catch (error: any) {
       if (!error.response) {
-        return rejectWithValue("Service is not available");
+        return rejectWithValue({ error: "Service is not available" });
       }
       return rejectWithValue(error.response.data);
     }
@@ -156,7 +158,7 @@ export const fetchUserPosts = createAsyncThunk(
       };
     } catch (error: any) {
       if (!error.response) {
-        return rejectWithValue("Service is not available");
+        return rejectWithValue({ error: "Service is not available" });
       }
       return rejectWithValue(error.response.data);
     }
@@ -168,28 +170,55 @@ export const createPost = createAsyncThunk(
   async (
     {
       token,
-      formData,
+      title,
+      content,
+      tags = [],
+      pictures = [],
     }: {
       token: string;
-      formData: { title: string; content: string };
+      title: string;
+      content: string;
+      tags?: string[];
+      pictures?: File[];
     },
     { rejectWithValue },
   ) => {
+    if (token === "") {
+      return rejectWithValue({
+        error: "You need to be logged in to create a post",
+      });
+    }
     try {
+      const postFormData = new FormData();
+
+      postFormData.append("title", title);
+      postFormData.append("content", content);
+
+      if (tags && tags.length > 0) {
+        tags.forEach((tag) => {
+          postFormData.append("tags", tag);
+        });
+      }
+
+      if (pictures && pictures.length > 0) {
+        pictures.forEach((picture) => {
+          postFormData.append("pictures", picture);
+        });
+      }
+
       const response = await axios.post(
         `${import.meta.env.VITE_SERVICE_URL}/posts`,
-        { ...formData },
+        postFormData,
         {
           headers: {
             Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
           },
         },
       );
       return response.data;
     } catch (error: any) {
       if (!error.response) {
-        return rejectWithValue("Service is not available");
+        return rejectWithValue({ error: "Service is not available" });
       }
       return rejectWithValue(error.response.data);
     }
@@ -202,6 +231,11 @@ export const deletePost = createAsyncThunk(
     { post_id, token }: { post_id: number; token: string },
     { rejectWithValue },
   ) => {
+    if (token === "") {
+      return rejectWithValue({
+        error: "You need to be logged in to delete a post",
+      });
+    }
     try {
       await axios.delete(
         `${import.meta.env.VITE_SERVICE_URL}/posts/${post_id}`,
@@ -215,7 +249,42 @@ export const deletePost = createAsyncThunk(
       return post_id;
     } catch (error: any) {
       if (!error.response) {
-        return rejectWithValue("Service is not available");
+        return rejectWithValue({ error: "Service is not available" });
+      }
+      return rejectWithValue(error.response.data);
+    }
+  },
+);
+
+export const deletePostPicture = createAsyncThunk(
+  "posts/deletePostPicture",
+  async (
+    {
+      post_id,
+      picture_url,
+      token,
+    }: { post_id: number; picture_url: string; token: string },
+    { rejectWithValue },
+  ) => {
+    if (token === "") {
+      return rejectWithValue({
+        error: "You need to be logged in to delete a post picture",
+      });
+    }
+    try {
+      const response = await axios.delete(
+        `${import.meta.env.VITE_SERVICE_URL}/posts/${post_id}/picture/${picture_url}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+      return response.data;
+    } catch (error: any) {
+      if (!error.response) {
+        return rejectWithValue({ error: "Service is not available" });
       }
       return rejectWithValue(error.response.data);
     }
@@ -228,6 +297,11 @@ export const toggleMeToo = createAsyncThunk(
     { post_id, token }: { post_id: number; token: string },
     { rejectWithValue },
   ) => {
+    if (token === "") {
+      return rejectWithValue({
+        error: "You need to be logged in to Me Too a post",
+      });
+    }
     try {
       const response = await axios.post(
         `${import.meta.env.VITE_SERVICE_URL}/posts/${post_id}/metoo`,
@@ -243,7 +317,7 @@ export const toggleMeToo = createAsyncThunk(
       return response.data;
     } catch (error: any) {
       if (!error.response) {
-        return rejectWithValue("Service is not available");
+        return rejectWithValue({ error: "Service is not available" });
       }
       return rejectWithValue(error.response.data);
     }
@@ -256,6 +330,11 @@ export const toggleWatchlist = createAsyncThunk(
     { post_id, token }: { post_id: number; token: string },
     { rejectWithValue },
   ) => {
+    if (token === "") {
+      return rejectWithValue({
+        error: "You need to be logged in to watchlist a post",
+      });
+    }
     try {
       const response = await axios.post(
         `${import.meta.env.VITE_SERVICE_URL}/posts/${post_id}/watchlist`,
@@ -271,7 +350,7 @@ export const toggleWatchlist = createAsyncThunk(
       return response.data;
     } catch (error: any) {
       if (!error.response) {
-        return rejectWithValue("Service is not available");
+        return rejectWithValue({ error: "Service is not available" });
       }
       return rejectWithValue(error.response.data);
     }
@@ -288,6 +367,11 @@ export const createComment = createAsyncThunk(
     }: { token: string; post_id: number; content: string },
     { rejectWithValue },
   ) => {
+    if (token === "") {
+      return rejectWithValue({
+        error: "You need to be logged in to post a comment",
+      });
+    }
     try {
       const response = await axios.post(
         `${import.meta.env.VITE_SERVICE_URL}/posts/${post_id}/comment`,
@@ -302,7 +386,7 @@ export const createComment = createAsyncThunk(
       return response.data;
     } catch (error: any) {
       if (!error.response) {
-        return rejectWithValue("Service is not available");
+        return rejectWithValue({ error: "Service is not available" });
       }
       return rejectWithValue(error.response.data);
     }
@@ -319,6 +403,11 @@ export const deleteComment = createAsyncThunk(
     }: { post_id: number; comment_id: number; token: string },
     { rejectWithValue },
   ) => {
+    if (token === "") {
+      return rejectWithValue({
+        error: "You need to be logged in to delete a comment",
+      });
+    }
     try {
       await axios.delete(
         `${import.meta.env.VITE_SERVICE_URL}/posts/comment/${comment_id}`,
@@ -332,7 +421,7 @@ export const deleteComment = createAsyncThunk(
       return { comment_id, post_id };
     } catch (error: any) {
       if (!error.response) {
-        return rejectWithValue("Service is not available");
+        return rejectWithValue({ error: "Service is not available" });
       }
       return rejectWithValue(error.response.data);
     }
@@ -355,6 +444,11 @@ export const react = createAsyncThunk(
     },
     { rejectWithValue },
   ) => {
+    if (token === "") {
+      return rejectWithValue({
+        error: "You need to be logged in to react to a comment",
+      });
+    }
     try {
       const response = await axios.post(
         `${import.meta.env.VITE_SERVICE_URL}/posts/comment/${comment_id}/react`,
@@ -369,7 +463,7 @@ export const react = createAsyncThunk(
       return { ...response.data, post_id };
     } catch (error: any) {
       if (!error.response) {
-        return rejectWithValue("Service is not available");
+        return rejectWithValue({ error: "Service is not available" });
       }
       return rejectWithValue(error.response.data);
     }
@@ -386,6 +480,11 @@ export const toggleMarkAsSolution = createAsyncThunk(
     }: { post_id: number; comment_id: number; token: string },
     { rejectWithValue },
   ) => {
+    if (token === "") {
+      return rejectWithValue({
+        error: "You need to be logged in to mark a comment as solution",
+      });
+    }
     try {
       const response = await axios.put(
         `${import.meta.env.VITE_SERVICE_URL}/posts/comment/${comment_id}/solution`,
@@ -400,7 +499,7 @@ export const toggleMarkAsSolution = createAsyncThunk(
       return { ...response.data, post_id };
     } catch (error: any) {
       if (!error.response) {
-        return rejectWithValue("Service is not available");
+        return rejectWithValue({ error: "Service is not available" });
       }
       return rejectWithValue(error.response.data);
     }
@@ -481,6 +580,17 @@ const postSlice = createSlice({
       const error = (action.payload as { error: string }).error;
       toast.error(error);
     });
+    builder.addCase(deletePostPicture.fulfilled, (state, action) => {
+      const index = state.posts.findIndex(
+        (post) => post.id === action.payload.id,
+      );
+      state.posts[index].pictures = action.payload.pictures;
+      toast.success("Picture deleted");
+    });
+    builder.addCase(deletePostPicture.rejected, (_state, action) => {
+      const error = (action.payload as { error: string }).error;
+      toast.error(error);
+    });
     builder.addCase(toggleMeToo.fulfilled, (state, action) => {
       const index = state.posts.findIndex(
         (post) => post.id === action.payload.id,
@@ -516,6 +626,7 @@ const postSlice = createSlice({
         action.payload,
         ...(state.posts[index].comments || []),
       ];
+      state.posts[index].comment_count++;
       toast.success("Comment posted");
     });
     builder.addCase(createComment.rejected, (_state, action) => {
@@ -534,6 +645,7 @@ const postSlice = createSlice({
       if (state.posts[postIndex].solution?.id === action.payload.comment_id) {
         state.posts[postIndex].solution = null;
       }
+      state.posts[postIndex].comment_count--;
       toast.success("Comment deleted");
     });
     builder.addCase(deleteComment.rejected, (_state, action) => {

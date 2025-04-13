@@ -1,7 +1,7 @@
 # ---------------------------
 # 1) Build Stage
 # ---------------------------
-FROM golang:latest AS builder
+FROM golang:1.24.2 AS builder
 
 WORKDIR /app
 
@@ -32,6 +32,7 @@ RUN chmod +x /app/main
 
 # Create required directories with proper permissions
 RUN mkdir -p ./static/uploads/profile_pictures && \
+    mkdir -p ./static/uploads/attached_pictures && \
     chmod -R 777 ./static && \
     chown -R appuser:appgroup ./static
 

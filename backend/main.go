@@ -70,21 +70,20 @@ func main() {
     //      AllowHeaders: "Content-Type, Authorization",
     //  }))
 
-    // Check for static directory - don't fail if it doesn't exist
-    staticDir := "./static/uploads/profile_pictures"
-    if _, err := os.Stat(staticDir); os.IsNotExist(err) {
-        log.Printf("Notice: Static directory doesn't exist: %s", staticDir)
-        log.Printf("This is expected when running in Docker as it should be created in the Dockerfile")
-        log.Printf("For local development, make sure to create this directory manually")
-        
-        // Try to create it, but don't fail if we can't
-        if err := os.MkdirAll(staticDir, 0755); err != nil {
-            log.Printf("Warning: Could not create static directory: %s", err)
+    // Check for static directories
+    staticDirs := []string{"./static/uploads/profile_pictures", "./static/uploads/attached_pictures"}
+    for _, dir := range staticDirs {
+        if _, err := os.Stat(dir); os.IsNotExist(err) {
+            log.Printf("Warning: Static directory %s does not exist, creating it...", dir)
+            err := os.MkdirAll(dir, os.ModePerm)
+            if err != nil {
+                log.Printf("Error creating directory %s: %v", dir, err)
+            } else {
+                log.Printf("Static directory %s created successfully", dir)
+            }
         } else {
-            log.Printf("Created static directory: %s", staticDir)
+            log.Printf("Static directory %s exists", dir)
         }
-    } else {
-        log.Printf("Static directory exists: %s", staticDir)
     }
 
     // Set up static file serving

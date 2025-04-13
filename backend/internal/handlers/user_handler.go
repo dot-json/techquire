@@ -18,6 +18,7 @@ import (
 type publicUserData struct {
     ID                uint   `json:"id"`
     Username          string `json:"username"`
+    Role              string `json:"role"`
     ProfilePictureURL *string `json:"profile_picture_url"`
     Reputation        int    `json:"reputation"`
     NumberOfPosts     int    `json:"number_of_posts"`
@@ -43,6 +44,7 @@ func GetUser(c *fiber.Ctx) error {
     publicUser := publicUserData{
         ID:                user.ID,
         Username:          user.Username,
+        Role:              user.Role,
         ProfilePictureURL: user.ProfilePictureURL,
         Reputation:        user.Reputation,
         NumberOfPosts:     user.NumberOfPosts,

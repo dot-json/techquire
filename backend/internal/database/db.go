@@ -61,7 +61,7 @@ func ConnectDB() {
 
     // Auto-migrate the schema
     log.Println("[DB] Starting auto-migration...")
-    if err := DB.AutoMigrate(&models.User{}, &models.Post{}, &models.Comment{}, &models.Reaction{}, &models.MeToo{}); err != nil {
+    if err := DB.AutoMigrate(&models.User{}, &models.Post{}, &models.Comment{}, &models.Reaction{}, &models.MeToo{}, &models.UserWatchlist{}); err != nil {
         log.Fatalf("[ERROR] Failed to migrate database: %v", err)
     }
     log.Println("[DB] Auto-migration completed!")

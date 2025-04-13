@@ -1,6 +1,7 @@
 export interface ProfileData {
   id: number;
   username: string;
+  role: string;
   profile_picture_url: string | null;
   reputation: number;
   number_of_posts: number;
@@ -30,6 +31,8 @@ export interface PostData {
   title: string;
   content: string;
   comments?: CommentData[];
+  pictures?: string[];
+  tags?: string[];
   solution: {
     id: number;
     content: string;
