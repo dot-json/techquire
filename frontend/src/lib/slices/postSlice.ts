@@ -256,6 +256,64 @@ export const deletePost = createAsyncThunk(
   },
 );
 
+export const editPost = createAsyncThunk(
+  "posts/editPost",
+  async (
+    {
+      token,
+      post_id,
+      title,
+      content,
+      tags = [],
+      pictures = [],
+    }: {
+      token: string;
+      post_id: number;
+      title: string;
+      content: string;
+      tags?: string[];
+      pictures?: File[];
+    },
+    { rejectWithValue },
+  ) => {
+    if (token === "") {
+      return rejectWithValue({
+        error: "You need to be logged in to edit a post",
+      });
+    }
+    try {
+      const postFormData = new FormData();
+      postFormData.append("title", title);
+      postFormData.append("content", content);
+      if (tags && tags.length > 0) {
+        tags.forEach((tag) => {
+          postFormData.append("tags", tag);
+        });
+      }
+      if (pictures && pictures.length > 0) {
+        pictures.forEach((picture) => {
+          postFormData.append("new_pictures", picture);
+        });
+      }
+      const response = await axios.put(
+        `${import.meta.env.VITE_SERVICE_URL}/posts/${post_id}`,
+        postFormData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+      return response.data;
+    } catch (error: any) {
+      if (!error.response) {
+        return rejectWithValue({ error: "Service is not available" });
+      }
+      return rejectWithValue(error.response.data);
+    }
+  },
+);
+
 export const deletePostPicture = createAsyncThunk(
   "posts/deletePostPicture",
   async (
@@ -568,6 +626,22 @@ const postSlice = createSlice({
       toast.success("Post created");
     });
     builder.addCase(createPost.rejected, (state, action) => {
+      const error = (action.payload as { error: string }).error;
+      state.loading = false;
+      toast.error(error);
+    });
+    builder.addCase(editPost.pending, (state) => {
+      state.loading = true;
+    });
+    builder.addCase(editPost.fulfilled, (state, action) => {
+      const index = state.posts.findIndex(
+        (post) => post.id === action.payload.id,
+      );
+      state.posts[index] = action.payload;
+      state.loading = false;
+      toast.success("Post updated");
+    });
+    builder.addCase(editPost.rejected, (state, action) => {
       const error = (action.payload as { error: string }).error;
       state.loading = false;
       toast.error(error);

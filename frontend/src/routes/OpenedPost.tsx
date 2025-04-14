@@ -7,6 +7,7 @@ import {
   Check,
   Eye,
   LoaderCircle,
+  Pencil,
   Send,
   ThumbsDown,
   ThumbsUp,
@@ -31,6 +32,7 @@ import {
 import { Textarea } from "@/components/atoms/Textarea";
 import { Dialog, DialogContent, DialogHeader } from "@/components/atoms/Dialog";
 import { DialogDescription, DialogTitle } from "@radix-ui/react-dialog";
+import CreatePost from "@/components/CreatePost";
 
 const formatContentWithCodeBlocks = (content: string) => {
   const codeBlockRegex = /```([\w]*)\n([\s\S]*?)```/g;
@@ -89,6 +91,7 @@ const OpenedPost = () => {
     url: "",
     open: false,
   });
+  const [editPostOpen, setEditPostOpen] = useState(false);
 
   if (isNaN(post_id)) {
     return <Navigate to="/feed" />;
@@ -264,14 +267,51 @@ const OpenedPost = () => {
           {(role === "moderator" ||
             role === "admin" ||
             id === posts[0].user.id) && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setDeleteConfirmationOpen(true)}
-              className={cn("text-error hover:bg-error/25 active:bg-error/40")}
-            >
-              <Trash2 size={18} />
-            </Button>
+            <div className={cn("flex items-center gap-1")}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setEditPostOpen(true)}
+              >
+                <Pencil size={18} />
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setDeleteConfirmationOpen(true)}
+                className={cn(
+                  "text-error hover:bg-error/25 active:bg-error/40",
+                )}
+              >
+                <Trash2 size={18} />
+              </Button>
+
+              <div
+                className={cn(
+                  "fixed left-0 top-0 z-50 grid h-[100dvh] w-full place-items-center bg-background-950/80 backdrop-blur-sm transition-opacity",
+                  editPostOpen
+                    ? "opacity-100"
+                    : "pointer-events-none opacity-0",
+                )}
+              >
+                <div
+                  className={cn(
+                    "fixed left-0 top-0 hidden h-[100dvh] w-full sm:static",
+                  )}
+                  onClick={() => setEditPostOpen(false)}
+                ></div>
+                <CreatePost
+                  isModal={true}
+                  onClose={() => setEditPostOpen(false)}
+                  oldPostData={posts[0]}
+                  editMode={true}
+                  className={cn(
+                    "z-50 h-full w-full max-w-[50rem] sm:h-fit sm:border",
+                  )}
+                />
+              </div>
+            </div>
           )}
         </div>
         {formattedPostContent}
@@ -295,20 +335,6 @@ const OpenedPost = () => {
                         setImagePreview({ url: picture, open: true })
                       }
                     />
-                  )}
-                  {(role === "admin" || role === "moderator") && (
-                    <Button
-                      size={"icon"}
-                      variant="ghost"
-                      className={cn(
-                        "text-error hover:bg-error/25 active:bg-error/40",
-                      )}
-                      onClick={() =>
-                        handleDeletePostImage(picture.split("/").pop()!)
-                      }
-                    >
-                      <Trash2 size={16} />
-                    </Button>
                   )}
                 </div>
               ))}

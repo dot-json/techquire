@@ -1,12 +1,16 @@
 import { cn } from "@/lib/utils";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Input } from "./atoms/Input";
 import { Textarea } from "./atoms/Textarea";
 import { Button } from "./atoms/Button";
-import { Paperclip, Send, X } from "lucide-react";
+import { Paperclip, Save, Send, Trash2, X } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/lib/store";
-import { createPost } from "@/lib/slices/postSlice";
+import {
+  createPost,
+  deletePostPicture,
+  editPost,
+} from "@/lib/slices/postSlice";
 import { ClassValue } from "clsx";
 import { useNavigate } from "react-router";
 import {
@@ -30,10 +34,20 @@ const CreatePost = ({
   className,
   isModal = false,
   onClose,
+  editMode = false,
+  oldPostData,
 }: {
   className?: ClassValue;
   isModal?: boolean;
   onClose?: () => void;
+  editMode?: boolean;
+  oldPostData?: {
+    id: number;
+    title: string;
+    content: string;
+    tags?: string[];
+    pictures?: string[];
+  };
 }) => {
   const tutorialPlaceholder = `Write the details here...
 You can use code blocks like this:
@@ -50,23 +64,56 @@ console.log("Hello, world!");
     tags: [],
   });
   const [pictures, setPictures] = useState<File[]>([]);
+  const [imagePreview, setImagePreview] = useState<{
+    url: string;
+    open: Boolean;
+  }>({
+    url: "",
+    open: false,
+  });
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    dispatch(
-      createPost({
-        token,
-        title: postData.title,
-        content: postData.content,
-        tags: postData.tags,
-        pictures,
-      }),
-    ).then((res) => {
-      if (res.meta.requestStatus === "fulfilled") {
-        onClose?.();
-        navigate(`/post/${res.payload.id}`);
-      }
-    });
+    if (editMode && oldPostData) {
+      console.log(pictures);
+      dispatch(
+        editPost({
+          token,
+          post_id: oldPostData.id,
+          title: postData.title,
+          content: postData.content,
+          tags: postData.tags,
+          pictures,
+        }),
+      ).then((res) => {
+        if (res.meta.requestStatus === "fulfilled") {
+          onClose?.();
+        }
+      });
+    } else {
+      dispatch(
+        createPost({
+          token,
+          title: postData.title,
+          content: postData.content,
+          tags: postData.tags,
+          pictures,
+        }),
+      ).then((res) => {
+        if (res.meta.requestStatus === "fulfilled") {
+          onClose?.();
+          navigate(`/post/${res.payload.id}`);
+        }
+      });
+    }
+  };
+
+  const handleDeletePostImage = (picture_url: string) => {
+    if (oldPostData) {
+      dispatch(
+        deletePostPicture({ token, post_id: oldPostData.id, picture_url }),
+      );
+    }
   };
 
   const onPictureAdd = useCallback(
@@ -96,6 +143,24 @@ console.log("Hello, world!");
     [pictures],
   );
 
+  useEffect(() => {
+    if (editMode && oldPostData) {
+      console.log("oldPostData", oldPostData);
+      setPostData({
+        title: oldPostData.title,
+        content: oldPostData.content,
+        tags: oldPostData.tags || [],
+      });
+    }
+  }, [
+    editMode,
+    oldPostData?.title,
+    oldPostData?.content,
+    oldPostData?.tags,
+    oldPostData?.id,
+    oldPostData?.pictures,
+  ]);
+
   return (
     <div
       className={cn(
@@ -118,8 +183,10 @@ console.log("Hello, world!");
               variant="ghost"
               type="button"
               onClick={() => {
-                setPostData({ title: "", content: "", tags: [] });
-                setPictures([]);
+                if (!editMode) {
+                  setPostData({ title: "", content: "", tags: [] });
+                  setPictures([]);
+                }
                 onClose?.();
               }}
               className={cn("text-text-200")}
@@ -136,6 +203,68 @@ console.log("Hello, world!");
           }
           value={postData.content}
         />
+        {oldPostData?.pictures && oldPostData.pictures?.length > 0 && (
+          <div className={cn("flex flex-col gap-2")}>
+            <h3 className={cn("text-lg text-text-400")}>Pictures</h3>
+            <div className={cn("flex flex-wrap gap-4")}>
+              {oldPostData.pictures?.map((picture, id) => (
+                <div
+                  key={id}
+                  className={cn(
+                    "flex items-center gap-2 rounded-md border border-background-600 bg-background-800 p-2",
+                  )}
+                >
+                  {picture && (
+                    <img
+                      src={`${import.meta.env.VITE_SERVICE_URL}${picture}`}
+                      alt="post_attachment"
+                      className={cn("size-10 cursor-pointer rounded-md")}
+                      onClick={() =>
+                        setImagePreview({ url: picture, open: true })
+                      }
+                    />
+                  )}
+
+                  <Button
+                    size={"icon"}
+                    type="button"
+                    variant="ghost"
+                    className={cn(
+                      "text-error hover:bg-error/25 active:bg-error/40",
+                    )}
+                    onClick={() =>
+                      handleDeletePostImage(picture.split("/").pop()!)
+                    }
+                  >
+                    <Trash2 size={16} />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <div
+              className={cn(
+                "fixed left-0 top-0 z-[771] grid size-full place-items-center bg-background-950/50 p-4 backdrop-blur-sm transition-opacity",
+                imagePreview.open === false && "pointer-events-none opacity-0",
+              )}
+            >
+              {imagePreview.url && (
+                <img
+                  src={`${import.meta.env.VITE_SERVICE_URL}${imagePreview.url}`}
+                  alt="post attachment"
+                />
+              )}
+              <button
+                type="button"
+                onClick={() =>
+                  setImagePreview((prev) => ({ ...prev, open: false }))
+                }
+                className={cn("self-start justify-self-end [grid-area:1/1]")}
+              >
+                <X size={32} />
+              </button>
+            </div>
+          </div>
+        )}
         <div className={cn("flex items-center justify-between")}>
           <Dialog>
             <DialogTrigger asChild>
@@ -217,8 +346,17 @@ console.log("Hello, world!");
             </DialogContent>
           </Dialog>
           <Button type="submit">
-            <Send size={16} />
-            Post
+            {editMode ? (
+              <>
+                <Save size={16} />
+                Save
+              </>
+            ) : (
+              <>
+                <Send size={16} />
+                Post
+              </>
+            )}
           </Button>
         </div>
       </form>

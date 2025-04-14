@@ -287,6 +287,182 @@ func DeletePost(c *fiber.Ctx) error {
     })
 }
 
+// EditPost handles updating a post's details and optionally adding more pictures
+func EditPost(c *fiber.Ctx) error {
+    // Get user ID from the JWT token
+    var userID uint
+    if userIDFloat, ok := c.Locals("user_id").(float64); ok {
+        userID = uint(userIDFloat)
+    } else {
+        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+            "error": "Unauthorized or invalid token",
+        })
+    }
+
+    // Get post ID from URL parameter
+    postID, err := c.ParamsInt("post_id")
+    if err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Invalid post ID",
+        })
+    }
+
+    // Fetch the existing post
+    var post models.Post
+    if err := database.DB.First(&post, postID).Error; err != nil {
+        if err == gorm.ErrRecordNotFound {
+            return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+                "error": "Post not found",
+            })
+        }
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to fetch post",
+        })
+    }
+
+    // Check if user is authorized to edit this post
+    if post.UserID != userID {
+        // Check if user is admin or moderator
+        var user models.User
+        if err := database.DB.First(&user, userID).Error; err != nil {
+            return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+                "error": "Failed to retrieve user",
+            })
+        }
+        if user.Role != "admin" && user.Role != "moderator" {
+            return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+                "error": "You are not authorized to edit this post",
+            })
+        }
+    }
+
+    // Parse multipart form
+    form, err := c.MultipartForm()
+    if err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Failed to parse form data",
+        })
+    }
+
+    // Extract form fields - only update fields that are provided
+    if titleFields := form.Value["title"]; len(titleFields) > 0 && titleFields[0] != "" {
+        post.Title = titleFields[0]
+    }
+    
+    if contentFields := form.Value["content"]; len(contentFields) > 0 && contentFields[0] != "" {
+        post.Content = contentFields[0]
+    }
+    
+    // Extract tags - handle as array
+    if tagsFields := form.Value["tags"]; len(tagsFields) > 0 {
+        post.Tags = tagsFields
+    }
+
+    // Process new uploaded picture files
+    if files := form.File["new_pictures"]; len(files) > 0 {
+        // Check if adding these files would exceed the limit
+        totalPictureCount := len(post.Pictures) + len(files)
+        if totalPictureCount > 5 {
+            return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+                "error": "Total pictures would exceed the limit of 5",
+            })
+        }
+
+        uploadsDir := "./static/uploads/attached_pictures"
+
+        for _, file := range files {
+            // Check file size
+            if file.Size > 5*1024*1024 {
+                continue // Skip this file
+            }
+
+            // Check file type
+            fileContentType := file.Header.Get("Content-Type")
+            if fileContentType != "image/jpeg" && fileContentType != "image/png" && fileContentType != "image/webp" {
+                continue // Skip invalid file types
+            }
+
+            // Generate unique filename
+            filename := fmt.Sprintf("%d_%s", userID, uuid.New().String())
+            fileExt := filepath.Ext(file.Filename)
+            if fileExt == "" {
+                // Default extension based on content type
+                if fileContentType == "image/jpeg" {
+                    fileExt = ".jpg"
+                } else if fileContentType == "image/png" {
+                    fileExt = ".png"
+                } else {
+                    fileExt = ".webp"
+                }
+            }
+            filename = filename + fileExt
+            filePath := filepath.Join(uploadsDir, filename)
+            
+            // Save the file
+            if err := c.SaveFile(file, filePath); err != nil {
+                log.Printf("Error saving file: %v", err)
+                continue // Skip this file but continue with others
+            }
+
+            // Generate URL path for the picture
+            pictureURL := fmt.Sprintf("/static/uploads/attached_pictures/%s", filename)
+            post.Pictures = append(post.Pictures, pictureURL)
+        }
+    }
+
+    // Update the post in the database
+    if err := database.DB.Save(&post).Error; err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to update post: " + err.Error(),
+        })
+    }
+
+    // Fetch user data for response
+    var user models.User
+    if err := database.DB.First(&user, post.UserID).Error; err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to retrieve user associated with post",
+        })
+    }
+
+    // Get metoo count
+    var metooCount int64
+    database.DB.Model(&models.MeToo{}).Where("post_id = ?", post.ID).Count(&metooCount)
+    
+    // Check if post is watchlisted by current user
+    var isWatchlisted bool
+    var watchlistEntry models.UserWatchlist
+    isWatchlisted = database.DB.Where("post_id = ? AND user_id = ?", post.ID, userID).
+        First(&watchlistEntry).Error == nil
+    
+    // Check if user has added metoo
+    var isMetoo bool
+    var metooEntry models.MeToo
+    isMetoo = database.DB.Where("post_id = ? AND user_id = ?", post.ID, userID).
+        First(&metooEntry).Error == nil
+
+    // Return the updated post
+    postData := fiber.Map{
+        "id":             post.ID,
+        "title":          post.Title,
+        "content":        post.Content,
+        "pictures":       post.Pictures,
+        "tags":           post.Tags,
+        "created_at":     post.CreatedAt,
+        "updated_at":     post.UpdatedAt,
+        "is_metoo":       isMetoo,
+        "metoo_count":    metooCount,
+        "is_watchlisted": isWatchlisted,
+        "user": fiber.Map{
+            "id":                 user.ID,
+            "username":           user.Username,
+            "profile_picture_url": user.ProfilePictureURL,
+        },
+    }
+
+    return c.JSON(postData)
+}
+
 func DeletePostPicture(c *fiber.Ctx) error {
     // Get user ID from JWT token
     userIDFloat, ok := c.Locals("user_id").(float64)
