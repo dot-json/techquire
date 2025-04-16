@@ -12,6 +12,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 )
 
@@ -307,9 +308,11 @@ func EditPost(c *fiber.Ctx) error {
         })
     }
 
-    // Fetch the existing post
+    // Fetch the existing post with comments
     var post models.Post
-    if err := database.DB.First(&post, postID).Error; err != nil {
+    if err := database.DB.Preload("Comments", func(db *gorm.DB) *gorm.DB {
+        return db.Order("created_at DESC")
+    }).First(&post, postID).Error; err != nil {
         if err == gorm.ErrRecordNotFound {
             return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
                 "error": "Post not found",
@@ -441,6 +444,74 @@ func EditPost(c *fiber.Ctx) error {
     isMetoo = database.DB.Where("post_id = ? AND user_id = ?", post.ID, userID).
         First(&metooEntry).Error == nil
 
+    // Format comments to needs
+    formattedComments := make([]fiber.Map, 0, len(post.Comments))
+    for _, comment := range post.Comments {
+        var commentAuthor models.User
+        if err := database.DB.First(&commentAuthor, comment.UserID).Error; err != nil {
+            log.Printf("Error fetching author for comment %d: %v", comment.ID, err)
+            continue
+        }
+
+        // Check if the current user has liked or disliked this comment
+        var isLiked, isDisliked bool
+
+        // Only check reactions if user is authenticated
+        if userID > 0 {
+            var reaction models.Reaction
+            result := database.DB.Where("comment_id = ? AND user_id = ?", comment.ID, userID).First(&reaction)
+            if result.Error == nil {
+                // User has a reaction
+                isLiked = reaction.Type == "like"
+                isDisliked = reaction.Type == "dislike"
+            }
+        }
+        
+        // Format the comment with proper JSON structure
+        formattedComment := fiber.Map{
+            "id":         comment.ID,
+            "content":    comment.Content,
+            "pictures":   comment.Pictures,
+            "post_id":    comment.PostID,
+            "is_solution": comment.IsSolution,
+            "created_at": comment.CreatedAt,
+            "updated_at": comment.UpdatedAt,
+            "like_count":      comment.Likes,
+            "dislike_count":   comment.Dislikes,
+            "is_liked":       isLiked,
+            "is_disliked":    isDisliked,
+            "user": fiber.Map{
+                "id":                 commentAuthor.ID,
+                "username":           commentAuthor.Username,
+                "profile_picture_url": commentAuthor.ProfilePictureURL,
+            },
+        }
+        
+        formattedComments = append(formattedComments, formattedComment)
+    }
+
+    // Check if there's a solution for this post
+    var solution fiber.Map
+    solution = nil
+    var solutionComment models.Comment
+    if err := database.DB.Where("post_id = ? AND is_solution = ?", post.ID, true).First(&solutionComment).Error; err == nil {
+        // Solution exists, get the solver
+        var solver models.User
+        if err := database.DB.First(&solver, solutionComment.UserID).Error; err == nil {
+            solution = fiber.Map{
+                "id":         solutionComment.ID,
+                "content":    solutionComment.Content,
+                "pictures":   solutionComment.Pictures,
+                "created_at": solutionComment.CreatedAt,
+                "user": fiber.Map{
+                    "id":                 solver.ID,
+                    "username":           solver.Username,
+                    "profile_picture_url": solver.ProfilePictureURL,
+                },
+            }
+        }
+    }
+
     // Return the updated post
     postData := fiber.Map{
         "id":             post.ID,
@@ -450,6 +521,9 @@ func EditPost(c *fiber.Ctx) error {
         "tags":           post.Tags,
         "created_at":     post.CreatedAt,
         "updated_at":     post.UpdatedAt,
+        "comment_count":  len(post.Comments),
+        "comments":       formattedComments,
+        "solution":       solution,
         "is_metoo":       isMetoo,
         "metoo_count":    metooCount,
         "is_watchlisted": isWatchlisted,
@@ -622,6 +696,7 @@ func GetPost(c *fiber.Ctx) error {
             "id":         comment.ID,
             "content":    comment.Content,
             "post_id":    comment.PostID,
+            "pictures": comment.Pictures,
             "is_solution": comment.IsSolution,
             "created_at": comment.CreatedAt,
             "updated_at": comment.UpdatedAt,
@@ -671,6 +746,7 @@ func GetPost(c *fiber.Ctx) error {
             response["solution"] = fiber.Map{
                 "id":         solution.ID,
                 "content":    solution.Content,
+                "pictures":   solution.Pictures,
                 "created_at": solution.CreatedAt,
                 "user": fiber.Map{
                     "id":       solver.ID,
@@ -745,9 +821,8 @@ func GetPosts(c *fiber.Ctx) error {
             // Trim spaces from tags and ignore empty ones
             cleanTag := strings.TrimSpace(tag)
             if cleanTag != "" {
-                // Use JSON_CONTAINS for proper JSON array handling if available in your DB
-                // Otherwise use this LIKE approach
-                query = query.Where("posts.tags LIKE ?", "%"+cleanTag+"%")
+                // Use ANY for proper PostgreSQL array handling
+                query = query.Where("? = ANY(posts.tags)", cleanTag)
             }
         }
     }
@@ -813,12 +888,15 @@ func GetPosts(c *fiber.Ctx) error {
                 "%"+searchQuery+"%", "%"+searchQuery+"%")
         }
         
+        // Filter by tags
         if tagsQuery != "" {
             tagsList := strings.Split(tagsQuery, ",")
             for _, tag := range tagsList {
+                // Trim spaces from tags and ignore empty ones
                 cleanTag := strings.TrimSpace(tag)
                 if cleanTag != "" {
-                    query = query.Where("posts.tags LIKE ?", "%"+cleanTag+"%")
+                    // Use ANY operator with array_to_string for PostgreSQL text[] array
+                    query = query.Where("? = ANY(posts.tags)", cleanTag)
                 }
             }
         }
@@ -932,18 +1010,19 @@ func GetPosts(c *fiber.Ctx) error {
         
         // Get solutions for posts in one query
         type SolutionResult struct {
-            PostID           uint
-            SolutionID       uint
-            Content          string
-            CreatedAt        time.Time
-            UserID           uint
-            Username         string
+            PostID            uint
+            SolutionID        uint
+            Content           string
+            Pictures          pq.StringArray `gorm:"type:text[]" json:"pictures"`
+            CreatedAt         time.Time
+            UserID            uint
+            Username          string
             ProfilePictureURL string `gorm:"column:profile_picture_url"`
         }
         
         var solutions []SolutionResult
         database.DB.Model(&models.Comment{}).
-            Select("comments.post_id, comments.id as solution_id, comments.content, comments.created_at, users.id as user_id, users.username, users.profile_picture_url").
+            Select("comments.post_id, comments.id as solution_id, comments.content, comments.pictures, comments.created_at, users.id as user_id, users.username, users.profile_picture_url").
             Joins("JOIN users ON users.id = comments.user_id").
             Where("comments.post_id IN ? AND comments.is_solution = ?", postIDs, true).
             Scan(&solutions)
@@ -952,6 +1031,7 @@ func GetPosts(c *fiber.Ctx) error {
             solutionMap[sol.PostID] = fiber.Map{
                 "id":         sol.SolutionID,
                 "content":    sol.Content,
+                "pictures":   sol.Pictures,
                 "created_at": sol.CreatedAt,
                 "user": fiber.Map{
                     "id":                 sol.UserID,
@@ -1127,6 +1207,7 @@ func GetUserPosts(c *fiber.Ctx) error {
                 postData["solution"] = fiber.Map{
                     "id":         solution.ID,
                     "content":    solution.Content,
+                    "pictures":   solution.Pictures,
                     "created_at": solution.CreatedAt,
                     "user": fiber.Map{
                         "id":                 solver.ID,
@@ -1316,19 +1397,22 @@ func CreateComment(c* fiber.Ctx) error {
         })
     }
 
-    // Parse the request body
-    var commentRequest struct {
-        Content string `json:"content"`
-    }
-    
-    if err := c.BodyParser(&commentRequest); err != nil {
+    // Parse multipart form
+    form, err := c.MultipartForm()
+    if err != nil {
         return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-            "error": "Failed to parse request body",
+            "error": "Failed to parse form data",
         })
     }
 
+    // Extract comment content
+    var content string
+    if contentFields := form.Value["content"]; len(contentFields) > 0 {
+        content = contentFields[0]
+    }
+
     // Validate the comment data
-    if commentRequest.Content == "" {
+    if content == "" {
         return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
             "error": "Content is required",
         })
@@ -1347,9 +1431,63 @@ func CreateComment(c* fiber.Ctx) error {
         })
     }
 
+    // Process uploaded picture files
+    pictures := []string{}
+    if files := form.File["pictures"]; len(files) > 0 {
+        pictures = make([]string, 0, len(files))
+
+        if len(files) > 3 {
+            return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+                "error": "Attachment upload limit exceeded (max 3 files per comment)",
+            })
+        }
+
+        uploadsDir := "./static/uploads/attached_pictures"
+
+        for _, file := range files {
+            // Check file size
+            if file.Size > 5*1024*1024 {
+                continue // Skip this file
+            }
+
+            // Check file type
+            fileContentType := file.Header.Get("Content-Type")
+            if fileContentType != "image/jpeg" && fileContentType != "image/png" && fileContentType != "image/webp" {
+                continue // Skip invalid file types
+            }
+
+            // Generate unique filename
+            filename := fmt.Sprintf("comment_%d_%s", userID, uuid.New().String())
+            fileExt := filepath.Ext(file.Filename)
+            if fileExt == "" {
+                // Default extension based on content type
+                if fileContentType == "image/jpeg" {
+                    fileExt = ".jpg"
+                } else if fileContentType == "image/png" {
+                    fileExt = ".png"
+                } else {
+                    fileExt = ".webp"
+                }
+            }
+            filename = filename + fileExt
+            filePath := filepath.Join(uploadsDir, filename)
+            
+            // Save the file
+            if err := c.SaveFile(file, filePath); err != nil {
+                log.Printf("Error saving file: %v", err)
+                continue // Skip this file but continue with others
+            }
+
+            // Generate URL path for the picture
+            pictureURL := fmt.Sprintf("/static/uploads/attached_pictures/%s", filename)
+            pictures = append(pictures, pictureURL)
+        }
+    }
+
     // Create the comment with the user ID from the token
     comment := models.Comment{
-        Content: commentRequest.Content,
+        Content: content,
+        Pictures: pictures,
         PostID:  uint(postID),
         UserID:  userID,
     }
@@ -1370,17 +1508,265 @@ func CreateComment(c* fiber.Ctx) error {
     }
 
     commentData := fiber.Map{
-        "id":         comment.ID,
-        "content":    comment.Content,
-        "post_id":    comment.PostID,
+        "id":               comment.ID,
+        "post_id":          comment.PostID,
+        "content":          comment.Content,
+        "pictures":         comment.Pictures,
+        "is_solution":      comment.IsSolution,
+        "like_count":       comment.Likes,
+        "dislike_count":    comment.Dislikes,
+        "is_liked":         false,
+        "is_disliked":      false,
+        "created_at":       comment.CreatedAt,
+        "updated_at":       comment.UpdatedAt,
         "user": fiber.Map{
             "id":       user.ID,
             "username": user.Username,
             "profile_picture_url": user.ProfilePictureURL,
         },
-        "created_at": comment.CreatedAt,
-        "like_count":      comment.Likes,
-        "dislike_count":   comment.Dislikes,
+    }
+
+    return c.JSON(commentData)
+}
+
+// DeleteCommentPicture handles deleting a specific picture from a comment
+func DeleteCommentPicture(c *fiber.Ctx) error {
+    // Get user ID from JWT token
+    userIDFloat, ok := c.Locals("user_id").(float64)
+    if !ok {
+        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+            "error": "Unauthorized",
+        })
+    }
+    userID := uint(userIDFloat)
+
+    // Get comment ID from URL parameter
+    commentID, err := c.ParamsInt("comment_id")
+    if err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Invalid comment ID",
+        })
+    }
+
+    // Get picture URL from query parameter
+    pictureURL := c.Params("picture_url")
+    if pictureURL == "" {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Picture URL is required",
+        })
+    }
+
+    // Check if the comment exists
+    var comment models.Comment
+    if err := database.DB.First(&comment, commentID).Error; err != nil {
+        if err == gorm.ErrRecordNotFound {
+            return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+                "error": "Comment not found",
+            })
+        }
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to fetch comment",
+        })
+    }
+
+    // Check if the user is authorized to delete the picture
+    if comment.UserID != userID {
+        var user models.User
+        if err := database.DB.First(&user, userID).Error; err != nil {
+            return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+                "error": "Failed to retrieve user",
+            })
+        }
+        if user.Role != "admin" && user.Role != "moderator" {
+            return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+                "error": "You are not authorized to delete this picture",
+            })
+        }
+    }
+
+    // Remove the picture from the comment's Pictures slice
+    for i, pic := range comment.Pictures {
+        if filepath.Base(pic) == pictureURL {
+            comment.Pictures = append(comment.Pictures[:i], comment.Pictures[i+1:]...)
+            break
+        }
+    }
+
+    // Update the comment in the database
+    if err := database.DB.Save(&comment).Error; err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to update comment",
+        })
+    }
+
+    // Delete the picture file from the filesystem
+    filePath := fmt.Sprintf("./static/uploads/attached_pictures/%s", pictureURL)
+    if err := os.Remove(filePath); err != nil {
+        log.Printf("Error deleting file %s: %v", filePath, err)
+    }
+
+    return c.JSON(fiber.Map{
+        "id":       comment.ID,
+        "pictures": comment.Pictures,
+    })
+}
+
+// EditComment handles updating a comment's content and optionally adding more pictures
+func EditComment(c *fiber.Ctx) error {
+    // Get user ID from the JWT token
+    var userID uint
+    if userIDFloat, ok := c.Locals("user_id").(float64); ok {
+        userID = uint(userIDFloat)
+    } else {
+        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+            "error": "Unauthorized or invalid token",
+        })
+    }
+
+    // Get comment ID from URL parameter
+    commentID, err := c.ParamsInt("comment_id")
+    if err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Invalid comment ID",
+        })
+    }
+
+    // Check if comment exists
+    var comment models.Comment
+    if err := database.DB.First(&comment, commentID).Error; err != nil {
+        if err == gorm.ErrRecordNotFound {
+            return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+                "error": "Comment not found",
+            })
+        }
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to fetch comment",
+        })
+    }
+
+    // Check if the user is authorized to edit this comment
+    if comment.UserID != userID {
+        var user models.User
+        if err := database.DB.First(&user, userID).Error; err != nil {
+            return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+                "error": "Failed to retrieve user",
+            })
+        }
+        if user.Role != "admin" && user.Role != "moderator" {
+            return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+                "error": "You are not authorized to edit this comment",
+            })
+        }
+    }
+
+    // Parse multipart form
+    form, err := c.MultipartForm()
+    if err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Failed to parse form data",
+        })
+    }
+
+    // Extract content - only update if provided
+    if contentFields := form.Value["content"]; len(contentFields) > 0 && contentFields[0] != "" {
+        comment.Content = contentFields[0]
+    }
+
+    // Process new uploaded picture files
+    if files := form.File["new_pictures"]; len(files) > 0 {
+        // Check if adding these files would exceed the limit
+        totalPictureCount := len(comment.Pictures) + len(files)
+        if totalPictureCount > 3 {
+            return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+                "error": "Total pictures would exceed the limit of 3",
+            })
+        }
+
+        uploadsDir := "./static/uploads/attached_pictures"
+
+        for _, file := range files {
+            // Check file size
+            if file.Size > 5*1024*1024 {
+                continue // Skip this file
+            }
+
+            // Check file type
+            fileContentType := file.Header.Get("Content-Type")
+            if fileContentType != "image/jpeg" && fileContentType != "image/png" && fileContentType != "image/webp" {
+                continue // Skip invalid file types
+            }
+
+            // Generate unique filename
+            filename := fmt.Sprintf("comment_%d_%s", userID, uuid.New().String())
+            fileExt := filepath.Ext(file.Filename)
+            if fileExt == "" {
+                // Default extension based on content type
+                if fileContentType == "image/jpeg" {
+                    fileExt = ".jpg"
+                } else if fileContentType == "image/png" {
+                    fileExt = ".png"
+                } else {
+                    fileExt = ".webp"
+                }
+            }
+            filename = filename + fileExt
+            filePath := filepath.Join(uploadsDir, filename)
+            
+            // Save the file
+            if err := c.SaveFile(file, filePath); err != nil {
+                log.Printf("Error saving file: %v", err)
+                continue // Skip this file but continue with others
+            }
+
+            // Generate URL path for the picture
+            pictureURL := fmt.Sprintf("/static/uploads/attached_pictures/%s", filename)
+            comment.Pictures = append(comment.Pictures, pictureURL)
+        }
+    }
+
+    // Update the comment in the database
+    if err := database.DB.Save(&comment).Error; err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to update comment: " + err.Error(),
+        })
+    }
+
+    // Fetch user data for response
+    var user models.User
+    if err := database.DB.First(&user, comment.UserID).Error; err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to retrieve user associated with comment",
+        })
+    }
+
+    // Check if the current user has liked or disliked this comment
+    var isLiked, isDisliked bool
+    var reaction models.Reaction
+    result := database.DB.Where("comment_id = ? AND user_id = ?", comment.ID, userID).First(&reaction)
+    if result.Error == nil {
+        // User has a reaction
+        isLiked = reaction.Type == "like"
+        isDisliked = reaction.Type == "dislike"
+    }
+
+    // Return the updated comment
+    commentData := fiber.Map{
+        "id":               comment.ID,
+        "content":          comment.Content,
+        "pictures":         comment.Pictures,
+        "post_id":          comment.PostID,
+        "is_solution":      comment.IsSolution,
+        "created_at":       comment.CreatedAt,
+        "updated_at":       comment.UpdatedAt,
+        "like_count":       comment.Likes,
+        "dislike_count":    comment.Dislikes,
+        "is_liked":         isLiked,
+        "is_disliked":      isDisliked,
+        "user": fiber.Map{
+            "id":                 user.ID,
+            "username":           user.Username,
+            "profile_picture_url": user.ProfilePictureURL,
+        },
     }
 
     return c.JSON(commentData)
@@ -1432,6 +1818,14 @@ func DeleteComment(c *fiber.Ctx) error {
         return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
             "error": "You are not the author of this comment",
         })
+    }
+
+    // Delete the comment's pictures from the filesystem
+    for _, picture := range comment.Pictures {
+        filePath := fmt.Sprintf("./static/uploads/attached_pictures/%s", filepath.Base(picture))
+        if err := os.Remove(filePath); err != nil {
+            log.Printf("Error deleting file %s: %v", filePath, err)
+        }
     }
 
     // Delete the comment
@@ -1719,6 +2113,7 @@ func ToggleMarkCommentAsSolution(c *fiber.Ctx) error {
         "solution": fiber.Map{
             "id":         comment.ID,
             "content":    comment.Content,
+            "pictures":   comment.Pictures,
             "created_at": comment.CreatedAt,
             "user": fiber.Map{
                 "id":                 commentAuthor.ID,

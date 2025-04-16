@@ -422,7 +422,8 @@ export const createComment = createAsyncThunk(
       token,
       post_id,
       content,
-    }: { token: string; post_id: number; content: string },
+      pictures = [],
+    }: { token: string; post_id: number; content: string; pictures?: File[] },
     { rejectWithValue },
   ) => {
     if (token === "") {
@@ -431,9 +432,58 @@ export const createComment = createAsyncThunk(
       });
     }
     try {
+      const commentFormData = new FormData();
+
+      commentFormData.append("content", content);
+      if (pictures && pictures.length > 0) {
+        pictures.forEach((picture) => {
+          commentFormData.append("pictures", picture);
+        });
+      }
+
       const response = await axios.post(
         `${import.meta.env.VITE_SERVICE_URL}/posts/${post_id}/comment`,
-        { content },
+        commentFormData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+      return response.data;
+    } catch (error: any) {
+      if (!error.response) {
+        return rejectWithValue({ error: "Service is not available" });
+      }
+      return rejectWithValue(error.response.data);
+    }
+  },
+);
+
+export const deleteCommentPicture = createAsyncThunk(
+  "posts/deleteCommentPicture",
+  async (
+    {
+      post_id,
+      comment_id,
+      picture_url,
+      token,
+    }: {
+      post_id: number;
+      comment_id: number;
+      picture_url: string;
+      token: string;
+    },
+    { rejectWithValue },
+  ) => {
+    if (token === "") {
+      return rejectWithValue({
+        error: "You need to be logged in to delete a comment picture",
+      });
+    }
+    try {
+      const response = await axios.delete(
+        `${import.meta.env.VITE_SERVICE_URL}/posts/comment/${comment_id}/picture/${picture_url}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -441,7 +491,58 @@ export const createComment = createAsyncThunk(
           },
         },
       );
-      return response.data;
+      return { ...response.data, post_id };
+    } catch (error: any) {
+      if (!error.response) {
+        return rejectWithValue({ error: "Service is not available" });
+      }
+      return rejectWithValue(error.response.data);
+    }
+  },
+);
+
+export const editComment = createAsyncThunk(
+  "posts/editComment",
+  async (
+    {
+      token,
+      post_id,
+      comment_id,
+      content,
+      pictures = [],
+    }: {
+      token: string;
+      post_id: number;
+      comment_id: number;
+      content: string;
+      pictures?: File[];
+    },
+    { rejectWithValue },
+  ) => {
+    if (token === "") {
+      return rejectWithValue({
+        error: "You need to be logged in to edit a comment",
+      });
+    }
+    try {
+      const commentFormData = new FormData();
+      commentFormData.append("content", content);
+      if (pictures && pictures.length > 0) {
+        pictures.forEach((picture) => {
+          commentFormData.append("new_pictures", picture);
+        });
+      }
+
+      const response = await axios.put(
+        `${import.meta.env.VITE_SERVICE_URL}/posts/comment/${comment_id}`,
+        commentFormData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+      return { ...response.data, post_id };
     } catch (error: any) {
       if (!error.response) {
         return rejectWithValue({ error: "Service is not available" });
@@ -704,6 +805,48 @@ const postSlice = createSlice({
       toast.success("Comment posted");
     });
     builder.addCase(createComment.rejected, (_state, action) => {
+      const error = (action.payload as { error: string }).error;
+      toast.error(error);
+    });
+    builder.addCase(deleteCommentPicture.fulfilled, (state, action) => {
+      const postIndex = state.posts.findIndex(
+        (post) => post.id === action.payload.post_id,
+      );
+      const commentIndex = state.posts[postIndex].comments?.findIndex(
+        (comment) => comment.id === action.payload.id,
+      );
+      state.posts[postIndex].comments![commentIndex!].pictures =
+        action.payload.pictures;
+      if (
+        state.posts[postIndex].comments![commentIndex!].is_solution &&
+        state.posts[postIndex].solution
+      ) {
+        state.posts[postIndex].solution.pictures = action.payload.pictures;
+      }
+      toast.success("Comment picture deleted");
+    });
+    builder.addCase(deleteCommentPicture.rejected, (_state, action) => {
+      const error = (action.payload as { error: string }).error;
+      toast.error(error);
+    });
+    builder.addCase(editComment.fulfilled, (state, action) => {
+      const postIndex = state.posts.findIndex(
+        (post) => post.id === action.payload.post_id,
+      );
+      const commentIndex = state.posts[postIndex].comments?.findIndex(
+        (comment) => comment.id === action.payload.id,
+      );
+      state.posts[postIndex].comments![commentIndex!] = action.payload;
+      if (
+        state.posts[postIndex].comments![commentIndex!].is_solution &&
+        state.posts[postIndex].solution
+      ) {
+        state.posts[postIndex].solution.content = action.payload.content;
+        state.posts[postIndex].solution.pictures = action.payload.pictures;
+      }
+      toast.success("Comment updated");
+    });
+    builder.addCase(editComment.rejected, (_state, action) => {
       const error = (action.payload as { error: string }).error;
       toast.error(error);
     });

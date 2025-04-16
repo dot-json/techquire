@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { Button } from "./atoms/Button";
-import { Check, Eye, MessageSquareText, UserRoundPlus } from "lucide-react";
+import { Check, Eye, MessageSquareText, UserRoundPlus, X } from "lucide-react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { PostData } from "@/lib/interfaces";
@@ -8,6 +8,7 @@ import { Link } from "react-router";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/lib/store";
 import { toggleMeToo, toggleWatchlist } from "@/lib/slices/postSlice";
+import { useState } from "react";
 
 const formatContentWithCodeBlocks = (content: string) => {
   const codeBlockRegex = /```([\w]*)\n([\s\S]*?)```/g;
@@ -50,6 +51,7 @@ const Post = ({
   id,
   title,
   content,
+  tags,
   solution,
   user,
   comment_count,
@@ -65,6 +67,13 @@ const Post = ({
 
   const dispatch = useDispatch<AppDispatch>();
   const { token } = useSelector((state: RootState) => state.user);
+  const [imagePreview, setImagePreview] = useState<{
+    url: string;
+    open: Boolean;
+  }>({
+    url: "",
+    open: false,
+  });
 
   const handleToggleMetoo = () => {
     dispatch(toggleMeToo({ token, post_id: id }));
@@ -90,10 +99,24 @@ const Post = ({
         {title}
       </Link>
       {formattedPostContent}
+      {tags && tags.length > 0 && (
+        <div className={cn("flex flex-wrap gap-2")}>
+          {tags.map((tag, i) => (
+            <div
+              key={i}
+              className={cn(
+                "flex h-8 select-none items-center gap-1 rounded-md bg-background-700 px-2 py-1 text-sm font-medium text-text-100",
+              )}
+            >
+              {`#${tag}`}
+            </div>
+          ))}
+        </div>
+      )}
       <div className={cn("flex flex-wrap items-center gap-1 text-text-500")}>
         <p>Posted at</p>
         <p>{new Date(created_at).toLocaleString("en-US")}</p>
-        <p className={cn("mx-1 hidden sm:static")}>|</p>
+        <p className={cn("mx-1 hidden sm:block")}>|</p>
         <p>
           By{" "}
           <Link
@@ -107,7 +130,6 @@ const Post = ({
         </p>
       </div>
       <hr className={cn("border-t-background-600")} />
-
       {solution && (
         <>
           <div
@@ -118,34 +140,88 @@ const Post = ({
             <h2 className={cn("text-xl font-medium text-success")}>Solution</h2>
             <div
               className={cn(
-                "flex flex-col gap-4 rounded-md border border-background-600 bg-background-900 p-4",
+                "grid grid-cols-[auto_1fr_auto] gap-4 rounded-md border border-background-600 bg-background-900 p-4",
               )}
             >
-              <div className={cn("flex items-center gap-3")}>
-                <img
-                  src={
-                    solution.user.profile_picture_url
-                      ? `${import.meta.env.VITE_SERVICE_URL}${solution.user.profile_picture_url}`
-                      : "https://www.gravatar.com/avatar/?d=identicon&s=400"
-                  }
-                  alt="profile_pic"
-                  className={cn("size-12 rounded-full border sm:size-12")}
-                />
-                <Link
-                  to={`/profile/${solution.user.username}`}
-                  className={cn(
-                    "rounded-sm px-0.5 underline decoration-transparent underline-offset-2 outline-none transition-colors hover:decoration-text-100 focus-visible:ring-2 focus-visible:ring-text-500",
-                  )}
-                >
-                  <h1 className={cn("font-medium sm:text-base")}>
-                    {solution.user.username}
-                  </h1>
-                </Link>
-              </div>
-              {formattedSolutionContent}
-              <div className={cn("flex items-center gap-1 text-text-500")}>
-                <p>Posted at</p>
-                <p>{new Date(solution.created_at).toLocaleString("en-US")}</p>
+              <img
+                src={
+                  solution.user.profile_picture_url
+                    ? `${import.meta.env.VITE_SERVICE_URL}${solution.user.profile_picture_url}`
+                    : "https://www.gravatar.com/avatar/?d=identicon&s=400"
+                }
+                alt="profile_pic"
+                className={cn("size-12 rounded-full border sm:size-12")}
+              />
+              <div className={cn("flex flex-col gap-1")}>
+                <div className={cn("flex items-center gap-2")}>
+                  <Link
+                    to={`/profile/${solution.user.username}`}
+                    className={cn(
+                      "rounded-sm px-0.5 underline decoration-transparent underline-offset-2 outline-none transition-colors hover:decoration-text-100 focus-visible:ring-2 focus-visible:ring-text-500",
+                    )}
+                  >
+                    <h1 className={cn("font-medium sm:text-base")}>
+                      {solution.user.username}
+                    </h1>
+                  </Link>
+                  <p className={cn("text-sm font-light text-text-400")}>
+                    {new Date(solution.created_at).toLocaleString("en-US")}
+                  </p>
+                </div>
+                {formattedSolutionContent}
+                {solution.pictures && solution.pictures.length > 0 && (
+                  <div className={cn("mt-1 flex flex-col gap-2")}>
+                    <h2 className={cn("text-sm text-text-400")}>Pictures</h2>
+                    <div className={cn("flex flex-wrap gap-2")}>
+                      {solution.pictures.map((picture, index) => (
+                        <img
+                          key={index}
+                          src={`${import.meta.env.VITE_SERVICE_URL}${picture}`}
+                          alt="attachment"
+                          className={cn(
+                            "size-8 cursor-pointer rounded-md object-cover",
+                          )}
+                          onClick={() =>
+                            setImagePreview({ url: picture, open: true })
+                          }
+                        />
+                      ))}
+                    </div>
+                    <div
+                      className={cn(
+                        "fixed left-0 top-0 z-[771] grid size-full place-items-center bg-background-950/50 backdrop-blur-sm transition-opacity",
+                        imagePreview.open === false &&
+                          "pointer-events-none opacity-0",
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "fixed left-0 top-0 h-[100dvh] w-full [grid-area:1/1]",
+                        )}
+                        onClick={() =>
+                          setImagePreview((prev) => ({ ...prev, open: false }))
+                        }
+                      ></div>
+                      {imagePreview.url && (
+                        <img
+                          src={`${import.meta.env.VITE_SERVICE_URL}${imagePreview.url}`}
+                          alt="post attachment"
+                          className={cn("z-[771] [grid-area:1/1]")}
+                        />
+                      )}
+                      <button
+                        onClick={() =>
+                          setImagePreview((prev) => ({ ...prev, open: false }))
+                        }
+                        className={cn(
+                          "self-start justify-self-end [grid-area:1/1]",
+                        )}
+                      >
+                        <X size={32} />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -8,9 +8,10 @@ export interface ProfileData {
   number_of_solutions: number;
 }
 
-interface CommentData {
+export interface CommentData {
   id: number;
   content: string;
+  pictures?: string[];
   post_id: number;
   is_solution: boolean;
   created_at: string;
@@ -33,8 +34,14 @@ export interface PostData {
   comments?: CommentData[];
   pictures?: string[];
   tags?: string[];
+  comment_count: number;
+  created_at: string;
+  is_metoo: boolean;
+  metoo_count: number;
+  is_watchlisted: boolean;
   solution: {
     id: number;
+    pictures?: string[];
     content: string;
     user: {
       id: number;
@@ -48,9 +55,4 @@ export interface PostData {
     username: string;
     profile_picture_url: string | null;
   };
-  comment_count: number;
-  created_at: string;
-  is_metoo: boolean;
-  metoo_count: number;
-  is_watchlisted: boolean;
 }

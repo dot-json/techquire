@@ -4,6 +4,7 @@ import { cn } from "../lib/utils";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store";
 import { LoaderCircle } from "lucide-react";
+import BackToTop from "@/components/atoms/BackToTop";
 
 const MainLayout = ({ children }: { children: ReactNode }) => {
   const { loading } = useSelector((state: RootState) => state.user);
@@ -26,6 +27,7 @@ const MainLayout = ({ children }: { children: ReactNode }) => {
       >
         <LoaderCircle size={64} className={cn("animate-spin")} />
       </div>
+      <BackToTop />
     </>
   );
 };

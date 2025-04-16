@@ -12,7 +12,7 @@ type Post struct {
     Title       string          `gorm:"not null"`
     Content     string          `gorm:"not null"`
     Pictures    pq.StringArray  `gorm:"type:text[]"` // Array of picture URLs
-    Tags        []string        `gorm:"-"`
+    Tags        pq.StringArray  `gorm:"type:text[]"` // Array of tags
     UserID      uint            `gorm:"not null"` // Foreign key to User
     CreatedAt   time.Time
     UpdatedAt   time.Time

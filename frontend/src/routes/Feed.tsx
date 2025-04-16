@@ -46,7 +46,7 @@ const Feed = () => {
   const [sortBy, setSortBy] = useState<SortOption>("created_at_desc");
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
   const [isFilterChanged, setIsFilterChanged] = useState(false);
-  const [tags, setTags] = useState<string[]>(["tag1", "tag2", "tag3"]);
+  const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState("");
 
   // Load posts with current filters and sort
@@ -68,6 +68,7 @@ const Feed = () => {
     if (filters.watchlisted) params.is_watchlisted = true;
     if (filters.solved) params.has_solution = true;
     if (filters.unsolved) params.has_solution = false;
+    if (tags.length > 0) params.tags = tags.join(",");
 
     dispatch(fetchPosts({ token, ...params }));
   };
@@ -135,7 +136,7 @@ const Feed = () => {
     } else {
       setIsFilterChanged(true);
     }
-  }, [filters, sortBy]);
+  }, [filters, sortBy, tags]);
 
   // This effect will reload posts if any filtered properties change
   useEffect(() => {
@@ -255,7 +256,7 @@ const Feed = () => {
               <div
                 key={i}
                 className={cn(
-                  "flex h-8 select-none items-center gap-1 rounded-md bg-background-700 px-2 py-1 pl-3 text-sm font-semibold text-text-100",
+                  "flex h-8 select-none items-center gap-1 rounded-md bg-background-700 px-2 py-1 pl-3 text-sm font-medium text-text-100",
                 )}
               >
                 {`#${tag}`}
@@ -283,6 +284,7 @@ const Feed = () => {
               id={post.id}
               title={post.title}
               content={post.content}
+              tags={post.tags}
               solution={post.solution}
               user={post.user}
               comment_count={post.comment_count}
@@ -318,8 +320,7 @@ const Feed = () => {
           )}
           {posts.length === 0 && !loading && (
             <div className={cn("py-4 text-center text-text-400")}>
-              No posts available. Try adjusting your filters or creating a new
-              post.
+              No posts available. Try adjusting your filters.
             </div>
           )}
         </div>

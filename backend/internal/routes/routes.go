@@ -28,6 +28,8 @@ func SetupRoutes(app *fiber.App) {
     app.Post("/posts/:post_id/metoo", middleware.JWTProtected(), handlers.ToggleMetoo)
     app.Post("/posts/:post_id/watchlist", middleware.JWTProtected(), handlers.ToggleWatchlist)
     app.Post("/posts/:post_id/comment", middleware.JWTProtected(), handlers.CreateComment)
+    app.Put("posts/comment/:comment_id", middleware.JWTProtected(), handlers.EditComment)
+    app.Delete("/posts/comment/:comment_id/picture/:picture_url", middleware.JWTProtected(), handlers.DeleteCommentPicture)
     app.Delete("/posts/comment/:comment_id", middleware.JWTProtected(), handlers.DeleteComment)
     app.Post("/posts/comment/:comment_id/react", middleware.JWTProtected(), handlers.React)
     app.Put("/posts/comment/:comment_id/solution", middleware.JWTProtected(), handlers.ToggleMarkCommentAsSolution)

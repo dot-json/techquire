@@ -23,6 +23,12 @@ import {
   DialogClose,
 } from "./atoms/Dialog";
 import Dropzone from "react-dropzone";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "./atoms/Accordion";
 
 interface CreatePostData {
   title: string;
@@ -71,6 +77,7 @@ console.log("Hello, world!");
     url: "",
     open: false,
   });
+  const [newTag, setNewTag] = useState("");
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -116,6 +123,16 @@ console.log("Hello, world!");
     }
   };
 
+  const handleAddTag = () => {
+    if (newTag.trim() !== "") {
+      setPostData((prev) => ({
+        ...prev,
+        tags: [...(prev.tags || []), newTag.trim()],
+      }));
+      setNewTag("");
+    }
+  };
+
   const onPictureAdd = useCallback(
     (acceptedFiles: File[]) => {
       // handle same name files, add a number to the end of the file name if duplicate
@@ -145,7 +162,6 @@ console.log("Hello, world!");
 
   useEffect(() => {
     if (editMode && oldPostData) {
-      console.log("oldPostData", oldPostData);
       setPostData({
         title: oldPostData.title,
         content: oldPostData.content,
@@ -243,14 +259,23 @@ console.log("Hello, world!");
             </div>
             <div
               className={cn(
-                "fixed left-0 top-0 z-[771] grid size-full place-items-center bg-background-950/50 p-4 backdrop-blur-sm transition-opacity",
+                "fixed left-0 top-0 z-[771] grid size-full place-items-center bg-background-950/50 backdrop-blur-sm transition-opacity",
                 imagePreview.open === false && "pointer-events-none opacity-0",
               )}
             >
+              <div
+                className={cn(
+                  "fixed left-0 top-0 h-[100dvh] w-full [grid-area:1/1]",
+                )}
+                onClick={() =>
+                  setImagePreview((prev) => ({ ...prev, open: false }))
+                }
+              ></div>
               {imagePreview.url && (
                 <img
                   src={`${import.meta.env.VITE_SERVICE_URL}${imagePreview.url}`}
                   alt="post attachment"
+                  className={cn("z-[771] [grid-area:1/1]")}
                 />
               )}
               <button
@@ -265,6 +290,66 @@ console.log("Hello, world!");
             </div>
           </div>
         )}
+        <Accordion type="single" collapsible className="w-full">
+          <AccordionItem value="item-1">
+            <AccordionTrigger className={cn("text-lg text-text-200")}>
+              Tags
+            </AccordionTrigger>
+            <AccordionContent className={cn("flex flex-col gap-2")}>
+              <div className={cn("flex items-center gap-2")}>
+                <Input
+                  size={12}
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                  placeholder="Add a tag"
+                  className={cn("w-full")}
+                />
+                <Button
+                  variant="neutral"
+                  type="button"
+                  size="sm"
+                  onClick={handleAddTag}
+                  className={cn(
+                    "h-10 border-none bg-background-700 hover:bg-background-600 active:bg-background-500",
+                  )}
+                >
+                  Add
+                </Button>
+              </div>
+              <div
+                className={cn(
+                  "mt-2 flex flex-wrap gap-2",
+                  postData.tags?.length === 0 && "hidden",
+                )}
+              >
+                {postData.tags?.map((tag, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      "flex h-8 select-none items-center gap-1 rounded-md bg-background-700 px-2 py-1 pl-3 text-sm font-medium text-text-100",
+                    )}
+                  >
+                    {`#${tag}`}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPostData((prev) => ({
+                          ...prev,
+                          tags: prev.tags?.filter((_, index) => index !== i),
+                        }));
+                      }}
+                      className={cn(
+                        "rounded-md outline-none focus-visible:ring-2 focus-visible:ring-background-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background-600",
+                      )}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
         <div className={cn("flex items-center justify-between")}>
           <Dialog>
             <DialogTrigger asChild>
@@ -348,12 +433,12 @@ console.log("Hello, world!");
           <Button type="submit">
             {editMode ? (
               <>
-                <Save size={16} />
+                <Save size={18} />
                 Save
               </>
             ) : (
               <>
-                <Send size={16} />
+                <Send size={18} />
                 Post
               </>
             )}

@@ -81,6 +81,20 @@ export default {
         "body-pattern": "url('/square.svg')",
         "card-gradient": "linear-gradient(to bottom right, #2c2e2e, #1b1c1c)",
       },
+      keyframes: {
+        "accordion-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
+        },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+      },
+      animation: {
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],

@@ -129,9 +129,7 @@ const Header = () => {
         )}
       >
         <div
-          className={cn(
-            "fixed left-0 top-0 hidden h-[100dvh] w-full sm:static",
-          )}
+          className={cn("fixed left-0 top-0 hidden h-[100dvh] w-full sm:block")}
           onClick={() => setNewPostOpen(false)}
         ></div>
         <CreatePost
