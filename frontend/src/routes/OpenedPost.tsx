@@ -15,8 +15,6 @@ import {
   UserRoundPlus,
   X,
 } from "lucide-react";
-import SyntaxHighlighter from "react-syntax-highlighter";
-import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Button } from "@/components/atoms/Button";
 import {
   createComment,
@@ -40,43 +38,7 @@ import { DialogDescription, DialogTitle } from "@radix-ui/react-dialog";
 import CreatePost from "@/components/CreatePost";
 import Dropzone from "react-dropzone";
 import Comment from "@/components/Comment";
-
-const formatContentWithCodeBlocks = (content: string) => {
-  const codeBlockRegex = /```([\w]*)\n([\s\S]*?)```/g;
-  const formattedContent: (string | JSX.Element)[] = [];
-  let lastIndex = 0;
-
-  content.replace(codeBlockRegex, (match, lang, code, offset) => {
-    // Add text before the code block
-    formattedContent.push(content.substring(lastIndex, offset));
-
-    // Add the code block with syntax highlighting
-    formattedContent.push(
-      <SyntaxHighlighter
-        key={offset}
-        language={lang || "javascript"}
-        style={oneDark}
-        customStyle={{
-          padding: "1rem",
-          backgroundColor: "rgba(20, 21, 21, 0.5)",
-          border: "1px solid rgba(55, 56, 56, 0.75)",
-          fontSize: "1rem",
-          margin: "0",
-        }}
-      >
-        {code.trim()}
-      </SyntaxHighlighter>,
-    );
-
-    lastIndex = offset + match.length;
-    return "";
-  });
-
-  // Add any remaining text
-  formattedContent.push(content.substring(lastIndex));
-
-  return formattedContent;
-};
+import MarkdownRenderer from "@/components/atoms/MarkdownRenderer";
 
 const OpenedPost = () => {
   const { post_id: postIdParam } = useParams();
@@ -240,11 +202,6 @@ const OpenedPost = () => {
     );
   }
 
-  const formattedPostContent = formatContentWithCodeBlocks(posts[0].content);
-  const formattedSolutionContent = posts[0].solution
-    ? formatContentWithCodeBlocks(posts[0].solution.content)
-    : null;
-
   return (
     <div
       className={cn(
@@ -323,7 +280,7 @@ const OpenedPost = () => {
         )}
       >
         <div className={cn("flex items-start justify-between gap-4")}>
-          <h1 className={cn("text-2xl")}>{posts[0].title}</h1>
+          <h1 className={cn("text-2xl font-semibold")}>{posts[0].title}</h1>
           {(role === "moderator" ||
             role === "admin" ||
             id === posts[0].user.id) && (
@@ -372,9 +329,9 @@ const OpenedPost = () => {
             </div>
           )}
         </div>
-        {formattedPostContent}
+        <MarkdownRenderer content={posts[0].content} />
         {posts[0].pictures && posts[0].pictures.length > 0 && (
-          <div className={cn("flex flex-col gap-2")}>
+          <div className={cn("-mt-4 flex flex-col gap-2")}>
             <h3 className={cn("text-lg text-text-400")}>Pictures</h3>
             <div className={cn("flex flex-wrap gap-4")}>
               {posts[0].pictures.map((picture, id) => (
@@ -395,7 +352,12 @@ const OpenedPost = () => {
           </div>
         )}
         {posts[0].tags && posts[0].tags.length > 0 && (
-          <div className={cn("flex flex-col")}>
+          <div
+            className={cn(
+              "flex flex-col",
+              posts[0].pictures && posts[0].pictures.length === 0 && "-mt-4",
+            )}
+          >
             <h2 className={cn("text-lg text-text-400")}>Tags</h2>
             <div className={cn("mt-2 flex flex-wrap gap-2")}>
               {posts[0].tags.map((tag, i) => (
@@ -470,7 +432,7 @@ const OpenedPost = () => {
                       )}
                     </p>
                   </div>
-                  {formattedSolutionContent}
+                  <MarkdownRenderer content={posts[0].solution.content} />
                   {posts[0].solution.pictures &&
                     posts[0].solution.pictures.length > 0 && (
                       <div className={cn("mt-1 flex flex-col gap-2")}>

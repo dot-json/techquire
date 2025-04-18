@@ -1,51 +1,13 @@
 import { cn } from "@/lib/utils";
 import { Button } from "./atoms/Button";
 import { Check, Eye, MessageSquareText, UserRoundPlus, X } from "lucide-react";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { PostData } from "@/lib/interfaces";
 import { Link } from "react-router";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/lib/store";
 import { toggleMeToo, toggleWatchlist } from "@/lib/slices/postSlice";
 import { useState } from "react";
-
-const formatContentWithCodeBlocks = (content: string) => {
-  const codeBlockRegex = /```([\w]*)\n([\s\S]*?)```/g;
-  const formattedContent: (string | JSX.Element)[] = [];
-  let lastIndex = 0;
-
-  content.replace(codeBlockRegex, (match, lang, code, offset) => {
-    // Add text before the code block
-    formattedContent.push(content.substring(lastIndex, offset));
-
-    // Add the code block with syntax highlighting
-    formattedContent.push(
-      <SyntaxHighlighter
-        key={offset}
-        language={lang || "javascript"}
-        style={oneDark}
-        customStyle={{
-          padding: "1rem",
-          backgroundColor: "rgba(20, 21, 21, 0.5)",
-          border: "1px solid rgba(55, 56, 56, 0.75)",
-          fontSize: "1rem",
-          margin: "0",
-        }}
-      >
-        {code.trim()}
-      </SyntaxHighlighter>,
-    );
-
-    lastIndex = offset + match.length;
-    return "";
-  });
-
-  // Add any remaining text
-  formattedContent.push(content.substring(lastIndex));
-
-  return formattedContent;
-};
+import MarkdownRenderer from "./atoms/MarkdownRenderer";
 
 const Post = ({
   id,
@@ -60,11 +22,6 @@ const Post = ({
   metoo_count,
   is_watchlisted,
 }: PostData) => {
-  const formattedPostContent = formatContentWithCodeBlocks(content);
-  const formattedSolutionContent = solution
-    ? formatContentWithCodeBlocks(solution.content)
-    : null;
-
   const dispatch = useDispatch<AppDispatch>();
   const { token } = useSelector((state: RootState) => state.user);
   const [imagePreview, setImagePreview] = useState<{
@@ -93,14 +50,14 @@ const Post = ({
       <Link
         to={`/post/${id}`}
         className={cn(
-          "cursor-pointer text-2xl underline decoration-transparent underline-offset-4 transition-colors hover:decoration-text-100",
+          "cursor-pointer text-2xl font-semibold underline decoration-transparent underline-offset-4 transition-colors hover:decoration-text-100",
         )}
       >
         {title}
       </Link>
-      {formattedPostContent}
+      <MarkdownRenderer content={content} />
       {tags && tags.length > 0 && (
-        <div className={cn("flex flex-wrap gap-2")}>
+        <div className={cn("-mt-4 flex flex-wrap gap-2")}>
           {tags.map((tag, i) => (
             <div
               key={i}
@@ -168,7 +125,7 @@ const Post = ({
                     {new Date(solution.created_at).toLocaleString("en-US")}
                   </p>
                 </div>
-                {formattedSolutionContent}
+                <MarkdownRenderer content={solution.content} />
                 {solution.pictures && solution.pictures.length > 0 && (
                   <div className={cn("mt-1 flex flex-col gap-2")}>
                     <h2 className={cn("text-sm text-text-400")}>Pictures</h2>
