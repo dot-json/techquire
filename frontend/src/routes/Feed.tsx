@@ -128,6 +128,16 @@ const Feed = () => {
     }
   };
 
+  const handleSearchFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.input.trim() !== "") {
+      setSearchQuery((prev) => ({
+        ...prev,
+        query: searchQuery.input,
+      }));
+    }
+  };
+
   useEffect(() => {
     loadPosts(1, false);
   }, [token]);
@@ -290,7 +300,10 @@ const Feed = () => {
               "flex gap-2 rounded-lg border border-background-600 bg-background-900 p-4",
             )}
           >
-            <div className={cn("relative w-full")}>
+            <form
+              onSubmit={handleSearchFormSubmit}
+              className={cn("relative w-full")}
+            >
               <Input
                 placeholder="Search posts..."
                 value={searchQuery.input}
@@ -303,23 +316,18 @@ const Feed = () => {
                 type="button"
                 className={cn(
                   "absolute right-2 top-1/2 -translate-y-1/2 p-1 text-text-400 transition-colors hover:text-text-100",
+                  searchQuery.input === "" && "hidden",
                 )}
                 onClick={() => setSearchQuery({ input: "", query: "" })}
               >
                 <X size={20} />
               </button>
-            </div>
+            </form>
             <Button
               variant="neutral"
               className={cn(
                 "h-12 border-none bg-background-700 hover:bg-background-600 active:bg-background-500",
               )}
-              onClick={() =>
-                setSearchQuery((prev) => ({
-                  ...prev,
-                  query: searchQuery.input,
-                }))
-              }
             >
               <Search />
             </Button>

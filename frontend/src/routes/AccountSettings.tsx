@@ -166,7 +166,6 @@ const AccountSettings = () => {
   }, [username]);
 
   if (id === -1 && !loading) {
-    console.log(id);
     return <Navigate to="/login" replace />;
   }
 

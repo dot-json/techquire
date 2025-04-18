@@ -82,7 +82,6 @@ console.log("Hello, world!");
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (editMode && oldPostData) {
-      console.log(pictures);
       dispatch(
         editPost({
           token,

@@ -58,9 +58,9 @@ func main() {
     // 4. Enable CORS - simplest usage (allows all origins, methods, etc.)
     app.Use(cors.New(cors.Config{
         // Either * or list all front-end origins
-        AllowOrigins: "http://localhost:5173",
+        AllowOrigins: "*",
         AllowMethods: "GET,POST,PUT,DELETE,OPTIONS",
-        AllowHeaders: "Content-Type, Authorization",
+        AllowHeaders: "Content-Type, Authorization, ngrok-skip-browser-warning",
     }))
 
     //  (Optional) More specific config

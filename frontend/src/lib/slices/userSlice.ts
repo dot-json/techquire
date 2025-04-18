@@ -35,6 +35,7 @@ export const login = createAsyncThunk(
         {
           headers: {
             "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
           },
           responseType: "json",
         },
@@ -68,6 +69,7 @@ export const register = createAsyncThunk(
         {
           headers: {
             "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
           },
           responseType: "json",
         },
@@ -105,6 +107,7 @@ export const checkAuth = createAsyncThunk(
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
           },
           responseType: "json",
         },
@@ -139,6 +142,7 @@ export const updateUsername = createAsyncThunk(
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
           },
           responseType: "json",
         },
@@ -172,6 +176,7 @@ export const updatePassword = createAsyncThunk(
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
           },
           responseType: "json",
         },
@@ -196,7 +201,6 @@ export const updateProfilePicture = createAsyncThunk(
     try {
       const formData = new FormData();
       formData.append("profile_picture", file);
-      console.log(formData);
 
       const response = await axios.put(
         `${import.meta.env.VITE_SERVICE_URL}/users/update-profile-picture`,
@@ -204,6 +208,7 @@ export const updateProfilePicture = createAsyncThunk(
         {
           headers: {
             Authorization: `Bearer ${token}`,
+            "ngrok-skip-browser-warning": "true",
           },
           responseType: "json",
         },
@@ -232,6 +237,7 @@ export const updateUserRole = createAsyncThunk(
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
           },
           responseType: "json",
         },

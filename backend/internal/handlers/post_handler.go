@@ -810,7 +810,7 @@ func GetPosts(c *fiber.Ctx) error {
     
     // Search in title and content
     if searchQuery != "" {
-        query = query.Where("posts.title LIKE ? OR posts.content LIKE ?", 
+        query = query.Where("posts.title ILIKE ? OR posts.content ILIKE ?", 
             "%"+searchQuery+"%", "%"+searchQuery+"%")
     }
     

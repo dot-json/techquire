@@ -77,6 +77,7 @@ export const fetchPosts = createAsyncThunk(
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
           },
           params,
         },
@@ -110,6 +111,7 @@ export const fetchPost = createAsyncThunk(
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
           },
         },
       );
@@ -146,6 +148,7 @@ export const fetchUserPosts = createAsyncThunk(
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
           },
           params: {
             page,
@@ -213,6 +216,7 @@ export const createPost = createAsyncThunk(
         {
           headers: {
             Authorization: `Bearer ${token}`,
+            "ngrok-skip-browser-warning": "true",
           },
         },
       );
@@ -244,6 +248,7 @@ export const deletePost = createAsyncThunk(
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
           },
         },
       );
@@ -302,6 +307,7 @@ export const editPost = createAsyncThunk(
         {
           headers: {
             Authorization: `Bearer ${token}`,
+            "ngrok-skip-browser-warning": "true",
           },
         },
       );
@@ -337,6 +343,7 @@ export const deletePostPicture = createAsyncThunk(
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
           },
         },
       );
@@ -369,6 +376,7 @@ export const toggleMeToo = createAsyncThunk(
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
           },
           responseType: "json",
         },
@@ -402,6 +410,7 @@ export const toggleWatchlist = createAsyncThunk(
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
           },
           responseType: "json",
         },
@@ -448,6 +457,7 @@ export const createComment = createAsyncThunk(
         {
           headers: {
             Authorization: `Bearer ${token}`,
+            "ngrok-skip-browser-warning": "true",
           },
         },
       );
@@ -489,6 +499,7 @@ export const deleteCommentPicture = createAsyncThunk(
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
           },
         },
       );
@@ -540,6 +551,7 @@ export const editComment = createAsyncThunk(
         {
           headers: {
             Authorization: `Bearer ${token}`,
+            "ngrok-skip-browser-warning": "true",
           },
         },
       );
@@ -575,6 +587,7 @@ export const deleteComment = createAsyncThunk(
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
           },
         },
       );
@@ -617,6 +630,7 @@ export const react = createAsyncThunk(
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
           },
         },
       );
@@ -653,6 +667,7 @@ export const toggleMarkAsSolution = createAsyncThunk(
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
           },
         },
       );
@@ -871,7 +886,6 @@ const postSlice = createSlice({
       toast.error(error);
     });
     builder.addCase(react.fulfilled, (state, action) => {
-      console.log(action.payload);
       const postIndex = state.posts.findIndex((post) =>
         post.comments?.some((comment) => comment.id === action.payload.id),
       );
