@@ -167,6 +167,8 @@ console.log("Hello, world!");
         content: oldPostData.content,
         tags: oldPostData.tags || [],
       });
+    } else if (!editMode) {
+      setPostData({ title: "", content: "", tags: [] });
     }
   }, [
     editMode,
@@ -180,7 +182,7 @@ console.log("Hello, world!");
   return (
     <div
       className={cn(
-        "flex flex-col gap-4 rounded-lg border border-background-600/75 bg-background-900 p-4",
+        "flex flex-col gap-4 rounded-lg border border-background-600 bg-background-900 p-4",
         className,
       )}
     >

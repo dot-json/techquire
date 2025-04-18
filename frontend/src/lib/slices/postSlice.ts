@@ -81,6 +81,7 @@ export const fetchPosts = createAsyncThunk(
           params,
         },
       );
+
       return {
         data: response.data,
         append: append,

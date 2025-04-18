@@ -14,7 +14,7 @@ import Post from "@/components/Post";
 import { fetchPosts } from "@/lib/slices/postSlice";
 import { AppDispatch, RootState } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { Loader2, X } from "lucide-react";
+import { Loader2, Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
@@ -48,6 +48,13 @@ const Feed = () => {
   const [isFilterChanged, setIsFilterChanged] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState("");
+  const [searchQuery, setSearchQuery] = useState<{
+    input: string;
+    query: string;
+  }>({
+    input: "",
+    query: "",
+  });
 
   // Load posts with current filters and sort
   const loadPosts = (page = 1, append = false) => {
@@ -69,6 +76,7 @@ const Feed = () => {
     if (filters.solved) params.has_solution = true;
     if (filters.unsolved) params.has_solution = false;
     if (tags.length > 0) params.tags = tags.join(",");
+    if (searchQuery.query) params.search = searchQuery.query;
 
     dispatch(fetchPosts({ token, ...params }));
   };
@@ -136,7 +144,7 @@ const Feed = () => {
     } else {
       setIsFilterChanged(true);
     }
-  }, [filters, sortBy, tags]);
+  }, [filters, sortBy, tags, searchQuery.query]);
 
   // This effect will reload posts if any filtered properties change
   useEffect(() => {
@@ -277,6 +285,45 @@ const Feed = () => {
       </aside>
       <div className={cn("col-span-full lg:col-span-3")}>
         <div className={cn("flex flex-col gap-4")}>
+          <div
+            className={cn(
+              "flex gap-2 rounded-lg border border-background-600 bg-background-900 p-4",
+            )}
+          >
+            <div className={cn("relative w-full")}>
+              <Input
+                placeholder="Search posts..."
+                value={searchQuery.input}
+                onChange={(e) =>
+                  setSearchQuery((prev) => ({ ...prev, input: e.target.value }))
+                }
+                className={cn("h-12 md:text-lg")}
+              />
+              <button
+                type="button"
+                className={cn(
+                  "absolute right-2 top-1/2 -translate-y-1/2 p-1 text-text-400 transition-colors hover:text-text-100",
+                )}
+                onClick={() => setSearchQuery({ input: "", query: "" })}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <Button
+              variant="neutral"
+              className={cn(
+                "h-12 border-none bg-background-700 hover:bg-background-600 active:bg-background-500",
+              )}
+              onClick={() =>
+                setSearchQuery((prev) => ({
+                  ...prev,
+                  query: searchQuery.input,
+                }))
+              }
+            >
+              <Search />
+            </Button>
+          </div>
           {token !== "" && <CreatePost />}
           {posts.map((post, i) => (
             <Post
