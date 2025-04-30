@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import React from "react";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -14,7 +15,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   className,
 }) => {
   return (
-    <div className={className}>
+    <div className={cn("flex flex-col gap-2", className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -39,11 +40,11 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                 style={oneDark}
                 language={language}
                 PreTag="div"
-                className="my-4 overflow-auto rounded-md"
+                className="overflow-auto rounded-md"
                 showLineNumbers={true}
                 wrapLines={true}
                 customStyle={{
-                  margin: "1rem 0",
+                  margin: "0.25rem 0",
                   borderRadius: "0.375rem",
                   background: "#1c1d1d",
                   border: "1px solid #262727",
@@ -61,27 +62,23 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             );
           },
           // Style other markdown elements
-          p: ({ children }) => (
-            <p className="mb-4 leading-relaxed">{children}</p>
-          ),
+          p: ({ children }) => <p>{children}</p>,
           h1: ({ children }) => (
-            <h1 className="mb-4 text-2xl font-semibold">{children}</h1>
+            <h1 className="text-2xl font-semibold">{children}</h1>
           ),
           h2: ({ children }) => (
-            <h2 className="mb-3 text-xl font-medium">{children}</h2>
+            <h2 className="text-xl font-medium">{children}</h2>
           ),
           h3: ({ children }) => (
-            <h3 className="mb-3 text-lg font-medium">{children}</h3>
+            <h3 className="text-lg font-medium">{children}</h3>
           ),
-          ul: ({ children }) => (
-            <ul className="mb-2 ml-6 list-disc">{children}</ul>
-          ),
+          ul: ({ children }) => <ul className="ml-6 list-disc">{children}</ul>,
           ol: ({ children }) => (
-            <ol className="mb-4 ml-6 list-decimal">{children}</ol>
+            <ol className="ml-6 list-decimal">{children}</ol>
           ),
-          li: ({ children }) => <li className="mb-1">{children}</li>,
+          li: ({ children }) => <li className="">{children}</li>,
           blockquote: ({ children }) => (
-            <blockquote className="my-4 border-l-4 border-background-600 pl-4 italic">
+            <blockquote className="border-l-4 border-background-600 pl-4 italic">
               {children}
             </blockquote>
           ),
@@ -96,7 +93,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             </a>
           ),
           table: ({ children }) => (
-            <div className="my-4 overflow-x-auto">
+            <div className="overflow-x-auto">
               <table className="min-w-full border-collapse">{children}</table>
             </div>
           ),

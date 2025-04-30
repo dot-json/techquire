@@ -29,6 +29,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "./atoms/Accordion";
+import { toast } from "react-toastify";
 
 interface CreatePostData {
   title: string;
@@ -134,6 +135,28 @@ console.log("Hello, world!");
 
   const onPictureAdd = useCallback(
     (acceptedFiles: File[]) => {
+      // if more than 5 toast error
+      if (pictures.length + acceptedFiles.length > 5) {
+        toast.error("You can only upload a maximum of 5 pictures at a time.");
+        return;
+      }
+      // if file size is more than 5mb toast error
+      if (acceptedFiles.some((file) => file.size > 5 * 1024 * 1024)) {
+        toast.error("File size should be less than 5MB.");
+        return;
+      }
+      // if file type is not image toast error
+      if (
+        acceptedFiles.some(
+          (file) =>
+            !["image/jpeg", "image/png", "image/jpg", "image/webp"].includes(
+              file.type,
+            ),
+        )
+      ) {
+        toast.error("Only JPEG, PNG, JPG and WEBP files are allowed.");
+        return;
+      }
       // handle same name files, add a number to the end of the file name if duplicate
       const newFiles = acceptedFiles.map((file) => {
         const fileName = file.name.split(".")[0];
@@ -260,7 +283,7 @@ console.log("Hello, world!");
             </div>
             <div
               className={cn(
-                "fixed left-0 top-0 z-[771] grid size-full place-items-center bg-background-950/50 backdrop-blur-sm transition-opacity",
+                "fixed left-0 top-0 z-[771] grid size-full place-items-center bg-background-950/50 p-4 backdrop-blur-sm transition-opacity",
                 imagePreview.open === false && "pointer-events-none opacity-0",
               )}
             >
@@ -276,7 +299,9 @@ console.log("Hello, world!");
                 <img
                   src={`${import.meta.env.VITE_SERVICE_URL}${imagePreview.url}`}
                   alt="post attachment"
-                  className={cn("z-[771] [grid-area:1/1]")}
+                  className={cn(
+                    "z-[771] max-h-[90vh] max-w-[90vw] object-cover object-center [grid-area:1/1]",
+                  )}
                 />
               )}
               <button
@@ -284,7 +309,9 @@ console.log("Hello, world!");
                 onClick={() =>
                   setImagePreview((prev) => ({ ...prev, open: false }))
                 }
-                className={cn("self-start justify-self-end [grid-area:1/1]")}
+                className={cn(
+                  "z-[771] self-start justify-self-end [grid-area:1/1]",
+                )}
               >
                 <X size={32} />
               </button>

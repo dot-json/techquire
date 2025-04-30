@@ -1,8 +1,10 @@
 package database
 
 import (
+	"fmt"
 	"log"
 	"math/rand"
+	"strings"
 
 	"github.com/go-faker/faker/v4"
 	"golang.org/x/crypto/bcrypt"
@@ -36,9 +38,11 @@ func SeedUsers() {
             return
         }
 
+        uname := faker.FirstName()
+
         user := models.User{
-            Email:    faker.Email(),
-            Username: faker.FirstName(),
+            Email:    fmt.Sprintf("%s@email.com", strings.ToLower(uname)),
+            Username: uname,
             Password: string(hashed),
         }
         if err := DB.Create(&user).Error; err != nil {

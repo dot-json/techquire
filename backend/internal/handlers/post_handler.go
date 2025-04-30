@@ -133,6 +133,14 @@ func CreatePost(c *fiber.Ctx) error {
         })
     }
 
+    // Increment user's post count
+    user.NumberOfPosts++
+    if err := database.DB.Save(&user).Error; err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to update user post count",
+        })
+    }
+
     postData := fiber.Map{
         "id":             post.ID,
         "title":          post.Title,
@@ -280,6 +288,17 @@ func DeletePost(c *fiber.Ctx) error {
     if err := tx.Commit().Error; err != nil {
         return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
             "error": "Failed to commit transaction: " + err.Error(),
+        })
+    }
+
+    // Decrement user's post count
+    user.NumberOfPosts--
+    if user.NumberOfPosts < 0 {
+        user.NumberOfPosts = 0
+    }
+    if err := database.DB.Save(&user).Error; err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to update user post count",
         })
     }
     
@@ -1652,11 +1671,6 @@ func EditComment(c *fiber.Ctx) error {
                 "error": "Failed to retrieve user",
             })
         }
-        if user.Role != "admin" && user.Role != "moderator" {
-            return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-                "error": "You are not authorized to edit this comment",
-            })
-        }
     }
 
     // Parse multipart form
@@ -2094,6 +2108,15 @@ func ToggleMarkCommentAsSolution(c *fiber.Ctx) error {
                     "error": "Failed to unmark comment as solution",
                 })
             }
+            // Decrease the solution count
+            if user.NumberOfSolutions > 0 {
+                user.NumberOfSolutions--
+            }
+            if err := database.DB.Save(&user).Error; err != nil {
+                return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+                    "error": "Failed to update user solution count",
+                })
+            }
             return c.JSON(fiber.Map{
                 "id":         comment.ID,
                 "is_solution": false,
@@ -2107,6 +2130,14 @@ func ToggleMarkCommentAsSolution(c *fiber.Ctx) error {
             "error": "Failed to mark comment as solution",
         })
     }
+    // Increase the solution count
+    user.NumberOfSolutions++
+    if err := database.DB.Save(&user).Error; err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to update user solution count",
+        })
+    }
+
     return c.JSON(fiber.Map{
         "id":         comment.ID,
         "is_solution": true,

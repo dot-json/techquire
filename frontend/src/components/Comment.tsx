@@ -10,13 +10,13 @@ import {
   react,
   toggleMarkAsSolution,
 } from "@/lib/slices/postSlice";
+import MarkdownRenderer from "./atoms/MarkdownRenderer";
 
 const Comment = ({
   user_id,
   post_id,
   comment,
   post,
-  role,
   token,
   onEditComment,
   onPictureClick,
@@ -25,7 +25,6 @@ const Comment = ({
   post_id: number;
   comment: CommentData;
   post: PostData;
-  role: string;
   token: string;
   onEditComment: (comment: CommentData) => void;
   onPictureClick: (picture: string) => void;
@@ -70,10 +69,10 @@ const Comment = ({
             {new Date(comment.created_at).toLocaleString("en-US")}
           </p>
         </div>
-        <p>{comment.content}</p>
+        <MarkdownRenderer content={comment.content} />
         {comment.pictures && comment.pictures.length > 0 && (
-          <div className={cn("mt-1 flex flex-col gap-2")}>
-            <h2 className={cn("text-sm text-text-400")}>Pictures</h2>
+          <div className={cn("flex flex-col gap-2")}>
+            <h2 className={cn("text-text-400")}>Pictures</h2>
             <div className={cn("flex flex-wrap gap-2")}>
               {comment.pictures.map((picture, index) => (
                 <img
@@ -89,7 +88,7 @@ const Comment = ({
             </div>
           </div>
         )}
-        <div className={cn("mt-2 flex items-center gap-2")}>
+        <div className={cn("mt-1 flex items-center gap-2")}>
           <Button
             variant="ghost"
             size="sm"
@@ -135,9 +134,7 @@ const Comment = ({
             )}
         </div>
       </div>
-      {(user_id === comment.user.id ||
-        role === "admin" ||
-        role === "moderator") && (
+      {user_id === comment.user.id && (
         <div className={cn("flex gap-1")}>
           <Button
             variant="ghost"

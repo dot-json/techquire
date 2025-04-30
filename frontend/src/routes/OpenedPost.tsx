@@ -39,6 +39,7 @@ import CreatePost from "@/components/CreatePost";
 import Dropzone from "react-dropzone";
 import Comment from "@/components/Comment";
 import MarkdownRenderer from "@/components/atoms/MarkdownRenderer";
+import { toast } from "react-toastify";
 
 const OpenedPost = () => {
   const { post_id: postIdParam } = useParams();
@@ -144,6 +145,28 @@ const OpenedPost = () => {
 
   const onPictureAdd = useCallback(
     (acceptedFiles: File[]) => {
+      // if more than 5 toast error
+      if (newCommentPictures.length + acceptedFiles.length > 5) {
+        toast.error("You can only upload a maximum of 5 pictures at a time.");
+        return;
+      }
+      // if file size is more than 5mb toast error
+      if (acceptedFiles.some((file) => file.size > 5 * 1024 * 1024)) {
+        toast.error("File size should be less than 5MB.");
+        return;
+      }
+      // if file type is not image toast error
+      if (
+        acceptedFiles.some(
+          (file) =>
+            !["image/jpeg", "image/png", "image/jpg", "image/webp"].includes(
+              file.type,
+            ),
+        )
+      ) {
+        toast.error("Only JPEG, PNG, JPG and WEBP files are allowed.");
+        return;
+      }
       // handle same name files, add a number to the end of the file name if duplicate
       const newFiles = acceptedFiles.map((file) => {
         const fileName = file.name.split(".")[0];
@@ -331,7 +354,7 @@ const OpenedPost = () => {
         </div>
         <MarkdownRenderer content={posts[0].content} />
         {posts[0].pictures && posts[0].pictures.length > 0 && (
-          <div className={cn("-mt-4 flex flex-col gap-2")}>
+          <div className={cn("flex flex-col gap-2")}>
             <h3 className={cn("text-lg text-text-400")}>Pictures</h3>
             <div className={cn("flex flex-wrap gap-4")}>
               {posts[0].pictures.map((picture, id) => (
@@ -352,12 +375,7 @@ const OpenedPost = () => {
           </div>
         )}
         {posts[0].tags && posts[0].tags.length > 0 && (
-          <div
-            className={cn(
-              "flex flex-col",
-              posts[0].pictures && posts[0].pictures.length === 0 && "-mt-4",
-            )}
-          >
+          <div className={cn("flex flex-col")}>
             <h2 className={cn("text-lg text-text-400")}>Tags</h2>
             <div className={cn("mt-2 flex flex-wrap gap-2")}>
               {posts[0].tags.map((tag, i) => (
@@ -618,7 +636,6 @@ const OpenedPost = () => {
               comment={comment}
               post={posts[0]}
               token={token}
-              role={role}
               onEditComment={() => {
                 setEditCommentOpen(true);
                 setCommentToEdit(idx);
@@ -850,12 +867,14 @@ const OpenedPost = () => {
           <img
             src={`${import.meta.env.VITE_SERVICE_URL}${imagePreview.url}`}
             alt="post attachment"
-            className={cn("z-[771] [grid-area:1/1]")}
+            className={cn(
+              "z-[771] max-h-[90vh] max-w-[90vw] object-cover object-center [grid-area:1/1]",
+            )}
           />
         )}
         <button
           onClick={() => setImagePreview((prev) => ({ ...prev, open: false }))}
-          className={cn("self-start justify-self-end [grid-area:1/1]")}
+          className={cn("z-[771] self-start justify-self-end [grid-area:1/1]")}
         >
           <X size={32} />
         </button>

@@ -113,6 +113,8 @@ const Feed = () => {
       unsolved: false,
     });
     setSortBy("created_at_desc");
+    setTags([]);
+    setNewTag("");
   };
 
   const handleLoadMore = () => {

@@ -57,7 +57,7 @@ const Post = ({
       </Link>
       <MarkdownRenderer content={content} />
       {tags && tags.length > 0 && (
-        <div className={cn("-mt-4 flex flex-wrap gap-2")}>
+        <div className={cn("flex flex-wrap gap-2")}>
           {tags.map((tag, i) => (
             <div
               key={i}
@@ -146,7 +146,7 @@ const Post = ({
                     </div>
                     <div
                       className={cn(
-                        "fixed left-0 top-0 z-[771] grid size-full place-items-center bg-background-950/50 backdrop-blur-sm transition-opacity",
+                        "fixed left-0 top-0 z-[771] grid size-full place-items-center bg-background-950/50 p-4 backdrop-blur-sm transition-opacity",
                         imagePreview.open === false &&
                           "pointer-events-none opacity-0",
                       )}
@@ -163,7 +163,9 @@ const Post = ({
                         <img
                           src={`${import.meta.env.VITE_SERVICE_URL}${imagePreview.url}`}
                           alt="post attachment"
-                          className={cn("z-[771] [grid-area:1/1]")}
+                          className={cn(
+                            "z-[771] max-h-[90vh] max-w-[90vw] object-cover object-center [grid-area:1/1]",
+                          )}
                         />
                       )}
                       <button
@@ -171,7 +173,7 @@ const Post = ({
                           setImagePreview((prev) => ({ ...prev, open: false }))
                         }
                         className={cn(
-                          "self-start justify-self-end [grid-area:1/1]",
+                          "z-[771] self-start justify-self-end [grid-area:1/1]",
                         )}
                       >
                         <X size={32} />
