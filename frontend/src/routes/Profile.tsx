@@ -26,7 +26,7 @@ const Profile = () => {
   const { posts, pagination, loading } = useSelector(
     (state: RootState) => state.post,
   );
-  const { token } = useSelector((state: RootState) => state.user);
+  const { token, role } = useSelector((state: RootState) => state.user);
 
   useEffect(() => {
     const fetchProfileData = async () => {
@@ -126,7 +126,7 @@ const Profile = () => {
               {profileData.role}
             </p>
           </div>
-          {profileData.role === "user" && (
+          {role === "admin" && profileData.role === "user" && (
             <Button
               size="sm"
               className={cn("h-fit justify-self-end")}
@@ -135,7 +135,7 @@ const Profile = () => {
               Set moderator
             </Button>
           )}
-          {profileData.role === "moderator" && (
+          {role === "admin" && profileData.role === "moderator" && (
             <Button
               size="sm"
               className={cn("h-fit justify-self-end")}

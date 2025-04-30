@@ -403,20 +403,22 @@ const OpenedPost = () => {
                 <h2 className={cn("text-xl font-medium text-success")}>
                   Solution
                 </h2>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() =>
-                    posts[0].solution &&
-                    handleToggleSolution(posts[0].solution.id)
-                  }
-                  className={cn(
-                    "text-text-400 hover:bg-error/25 hover:text-error active:bg-error/40",
-                  )}
-                >
-                  <X size={16} />
-                  Remove Solution
-                </Button>
+                {id === posts[0].user.id && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      posts[0].solution &&
+                      handleToggleSolution(posts[0].solution.id)
+                    }
+                    className={cn(
+                      "text-text-400 hover:bg-error/25 hover:text-error active:bg-error/40",
+                    )}
+                  >
+                    <X size={16} />
+                    Remove Solution
+                  </Button>
+                )}
               </div>
               <div
                 className={cn(

@@ -132,6 +132,7 @@ const Feed = () => {
 
   const handleSearchFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Search query submitted:", searchQuery.input);
     if (searchQuery.input.trim() !== "") {
       setSearchQuery((prev) => ({
         ...prev,
@@ -190,7 +191,9 @@ const Feed = () => {
         <div className={cn("flex flex-col gap-2")}>
           <div className={cn("flex items-center justify-between")}>
             <h2 className={cn("text-lg text-text-200")}>Filters</h2>
-            {activeFiltersCount > 0 && (
+            {(activeFiltersCount > 0 ||
+              tags.length > 0 ||
+              sortBy !== "created_at_desc") && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -304,7 +307,7 @@ const Feed = () => {
           >
             <form
               onSubmit={handleSearchFormSubmit}
-              className={cn("relative w-full")}
+              className={cn("relative flex w-full items-center gap-2")}
             >
               <Input
                 placeholder="Search posts..."
@@ -317,22 +320,22 @@ const Feed = () => {
               <button
                 type="button"
                 className={cn(
-                  "absolute right-2 top-1/2 -translate-y-1/2 p-1 text-text-400 transition-colors hover:text-text-100",
+                  "absolute right-16 top-1/2 -translate-y-1/2 p-1 text-text-400 transition-colors hover:text-text-100",
                   searchQuery.input === "" && "hidden",
                 )}
                 onClick={() => setSearchQuery({ input: "", query: "" })}
               >
                 <X size={20} />
               </button>
+              <Button
+                variant="neutral"
+                className={cn(
+                  "h-12 border-none bg-background-700 hover:bg-background-600 active:bg-background-500",
+                )}
+              >
+                <Search />
+              </Button>
             </form>
-            <Button
-              variant="neutral"
-              className={cn(
-                "h-12 border-none bg-background-700 hover:bg-background-600 active:bg-background-500",
-              )}
-            >
-              <Search />
-            </Button>
           </div>
           {token !== "" && <CreatePost />}
           {posts.map((post, i) => (
