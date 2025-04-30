@@ -292,7 +292,7 @@ func UpdateProfilePicture(c *fiber.Ctx) error {
         })
     }
 
-    // Use static directory path (pre-created in Docker)
+    // Use static directory path
     uploadsDir := "./static/uploads/profile_pictures"
 
     // Generate unique filename

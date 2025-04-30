@@ -225,7 +225,7 @@ func DeletePost(c *fiber.Ctx) error {
         }
     }()
     
-    // 1. Delete metoo entries - must do this FIRST because of foreign key constraint
+    // 1. Delete metoo entries
     if err := tx.Where("post_id = ?", postID).Delete(&models.MeToo{}).Error; err != nil {
         tx.Rollback()
         return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -793,7 +793,7 @@ func GetPosts(c *fiber.Ctx) error {
     isMetoo := c.QueryBool("is_metoo", false)
     isWatchlisted := c.QueryBool("is_watchlisted", false)
     hasSolutionQuery := c.Query("has_solution")
-    userIDParam := c.Query("user_id") // For backward compatibility
+    userIDParam := c.Query("user_id")
     
     // Validate pagination parameters
     if limit > 50 {
@@ -820,9 +820,7 @@ func GetPosts(c *fiber.Ctx) error {
         Select("DISTINCT posts.*").
         Preload("Comments")
     
-    // Add filters
-    
-    // Filter by user_id (for backward compatibility)
+    // Filter by user_id
     if userIDParam != "" {
         query = query.Where("posts.user_id = ?", userIDParam)
     }
@@ -837,10 +835,8 @@ func GetPosts(c *fiber.Ctx) error {
     if tagsQuery != "" {
         tagsList := strings.Split(tagsQuery, ",")
         for _, tag := range tagsList {
-            // Trim spaces from tags and ignore empty ones
             cleanTag := strings.TrimSpace(tag)
             if cleanTag != "" {
-                // Use ANY for proper PostgreSQL array handling
                 query = query.Where("? = ANY(posts.tags)", cleanTag)
             }
         }
@@ -889,10 +885,8 @@ func GetPosts(c *fiber.Ctx) error {
         })
     }
     
-    // Apply sorting - ensure we always prefix with table name to avoid ambiguity
+    // Apply sorting
     if sortBy == "metoo_count" {
-        // Special case for sorting by metoo count using a window function approach
-        // This works because we include the sorting field in the selection
         query = database.DB.Table("posts").
             Select("posts.*, COALESCE((SELECT COUNT(*) FROM me_toos WHERE me_toos.post_id = posts.id), 0) as metoo_count").
             Preload("Comments")
@@ -911,10 +905,8 @@ func GetPosts(c *fiber.Ctx) error {
         if tagsQuery != "" {
             tagsList := strings.Split(tagsQuery, ",")
             for _, tag := range tagsList {
-                // Trim spaces from tags and ignore empty ones
                 cleanTag := strings.TrimSpace(tag)
                 if cleanTag != "" {
-                    // Use ANY operator with array_to_string for PostgreSQL text[] array
                     query = query.Where("? = ANY(posts.tags)", cleanTag)
                 }
             }
@@ -939,7 +931,7 @@ func GetPosts(c *fiber.Ctx) error {
             }
         }
         
-        // Now apply the sorting
+        // Apply the sorting
         if sortDir == "asc" {
             query = query.Order("metoo_count ASC, posts.created_at DESC")
         } else {
@@ -1064,7 +1056,8 @@ func GetPosts(c *fiber.Ctx) error {
         for _, post := range posts {
             user, found := userMap[post.UserID]
             if !found {
-                // Skip posts where we couldn't find the user
+                // Skip posts where user is not found
+                log.Printf("User not found for post ID %d", post.ID)                                            
                 continue
             }
             

@@ -8,7 +8,7 @@ type User struct {
     Email             string     `gorm:"unique;not null"`
     Username          string     `gorm:"unique;not null"`
     Password          string     `gorm:"not null"`
-    Role              string     `gorm:"default:'user'"` // User role: user, moderator, admin
+    Role              string     `gorm:"default:'user'"` // user, moderator, admin
     ProfilePictureURL *string    `gorm:"null"` // Nullable profile picture URL
     Reputation        int        `gorm:"default:0"` // User reputation points
     NumberOfPosts     int        `gorm:"default:0"` // Number of posts created by the user

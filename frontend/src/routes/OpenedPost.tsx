@@ -145,17 +145,17 @@ const OpenedPost = () => {
 
   const onPictureAdd = useCallback(
     (acceptedFiles: File[]) => {
-      // if more than 5 toast error
+      // If more than 5 pictures are selected, toast error
       if (newCommentPictures.length + acceptedFiles.length > 5) {
         toast.error("You can only upload a maximum of 5 pictures at a time.");
         return;
       }
-      // if file size is more than 5mb toast error
+      // If file size is more than 5MB, toast error
       if (acceptedFiles.some((file) => file.size > 5 * 1024 * 1024)) {
         toast.error("File size should be less than 5MB.");
         return;
       }
-      // if file type is not image toast error
+      // If file type is not jpeg, png, jpg or webp, toast error
       if (
         acceptedFiles.some(
           (file) =>
@@ -167,7 +167,7 @@ const OpenedPost = () => {
         toast.error("Only JPEG, PNG, JPG and WEBP files are allowed.");
         return;
       }
-      // handle same name files, add a number to the end of the file name if duplicate
+      // Handle same name files, add a number to the end of the file name if duplicate
       const newFiles = acceptedFiles.map((file) => {
         const fileName = file.name.split(".")[0];
         const fileExtension = file.name.split(".")[1];

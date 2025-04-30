@@ -42,10 +42,10 @@ func Login(c *fiber.Ctx) error {
         })
     }
 
-    // Create JWT with MapClaims - same approach as in debug routes
+    // Create JWT with MapClaims
     token := jwt.New(jwt.SigningMethodHS256)
     claims := token.Claims.(jwt.MapClaims)
-    claims["user_id"] = float64(user.ID)  // Store as float64 for consistency
+    claims["user_id"] = float64(user.ID)
     claims["exp"] = time.Now().Add(24 * time.Hour).Unix()
     claims["iat"] = time.Now().Unix()
 

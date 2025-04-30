@@ -68,7 +68,6 @@ func SeedPosts() {
                 Title:     faker.Sentence(),
                 Content:   faker.Paragraph(),
                 UserID:    user.ID,
-                // We'll calculate the actual MeTooCount after creating metoos
             }
             if err := DB.Create(&post).Error; err != nil {
                 log.Printf("Error creating post: %v", err)
@@ -138,8 +137,8 @@ func SeedComments() {
                 Content:  faker.Sentence(),
                 PostID:   post.ID,
                 UserID:   uint(rand.Intn(10)+1), // Randomly assign a user ID
-                Likes:    0, // Initialize likes to 0
-                Dislikes: 0, // Initialize dislikes to 0
+                Likes:    0,
+                Dislikes: 0,
                 IsSolution: false,
             }
             // If the post should have a solution, mark this comment as the solution

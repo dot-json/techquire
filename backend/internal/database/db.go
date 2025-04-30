@@ -41,6 +41,8 @@ func ConnectDB() {
         dbHost, dbUser, dbPass, dbName, dbPort,
     )
 
+    // Set up a new logger with custom configuration
+    // This logger will not log SQL statements, only errors and warnings
     newLogger := logger.New(
         log.New(os.Stdout, "\r\n", log.LstdFlags),
         logger.Config{
@@ -66,7 +68,7 @@ func ConnectDB() {
     }
     log.Println("[DB] Auto-migration completed!")
 
-    // Clear tables and seed data
+    // Clear tables and seed data for development
     log.Println("[DB] Clearing tables...")
     ClearDB()
     log.Println("[DB] Seeding tables...")

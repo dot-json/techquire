@@ -9,7 +9,7 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-// JWTProtected middleware with enhanced debugging - modified to match CheckAuth
+// JWTProtected middleware that protects routes with JWT authentication
 func JWTProtected() fiber.Handler {
     return func(c *fiber.Ctx) error {
         // Get Authorization header
@@ -29,7 +29,6 @@ func JWTProtected() fiber.Handler {
             })
         }
         
-        // Extract token from header EXACTLY as in CheckAuth
         token := authHeader[7:]
         
         // Get JWT secret
@@ -41,20 +40,17 @@ func JWTProtected() fiber.Handler {
             })
         }
         
-        // Parse EXACTLY as in CheckAuth
         claims := jwt.MapClaims{}
         t, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
             return []byte(secret), nil
         })
         
-        // Validate EXACTLY as in CheckAuth
         if err != nil || !t.Valid {
             return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
                 "error": "Invalid or expired token",
             })
         }
         
-        // Retrieve user ID from claims EXACTLY as in CheckAuth
         userID := claims["user_id"]
         if userID == nil {
             return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -81,7 +77,6 @@ func OptionalAuth() fiber.Handler {
             return c.Next()
         }
         
-        // Extract token from header EXACTLY as in CheckAuth
         token := authHeader[7:]
         
         // Get JWT secret
@@ -90,7 +85,6 @@ func OptionalAuth() fiber.Handler {
             return c.Next() // Continue without auth if no secret
         }
         
-        // Parse EXACTLY as in CheckAuth
         claims := jwt.MapClaims{}
         t, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
             return []byte(secret), nil

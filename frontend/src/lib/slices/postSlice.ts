@@ -874,7 +874,7 @@ const postSlice = createSlice({
         state.posts[postIndex].comments?.filter(
           (comment) => comment.id !== action.payload.comment_id,
         ) || [];
-      // if solution is deleted, set solution to null
+      // If solution is deleted, set solution to null
       if (state.posts[postIndex].solution?.id === action.payload.comment_id) {
         state.posts[postIndex].solution = null;
       }

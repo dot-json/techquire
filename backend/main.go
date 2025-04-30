@@ -55,15 +55,13 @@ func main() {
     // 3. Initialize Fiber
     app := fiber.New()
 
-    // 4. Enable CORS - simplest usage (allows all origins, methods, etc.)
+    // 4. Enable CORS (allows all origins, methods, etc.)
     app.Use(cors.New(cors.Config{
-        // Either * or list all front-end origins
         AllowOrigins: "*",
         AllowMethods: "GET,POST,PUT,DELETE,OPTIONS",
         AllowHeaders: "Content-Type, Authorization, ngrok-skip-browser-warning",
     }))
 
-    //  (Optional) More specific config
     //  app.Use(cors.New(cors.Config{
     //      AllowOrigins: "http://localhost:3000, https://myapp.com",
     //      AllowMethods: "GET,POST,PUT,DELETE,OPTIONS",
