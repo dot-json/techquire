@@ -1907,6 +1907,15 @@ func React(c *fiber.Ctx) error {
         })
     }
 
+    // Fetch comment author to update their reputation
+    var commentAuthor models.User
+    if err := tx.First(&commentAuthor, comment.UserID).Error; err != nil {
+        tx.Rollback()
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to fetch comment author",
+        })
+    }
+
     // Check if the user has already reacted to the comment
     var existingReaction models.Reaction
     result := tx.Where("comment_id = ? AND user_id = ?", commentID, userID).First(&existingReaction)
@@ -1932,10 +1941,14 @@ func React(c *fiber.Ctx) error {
                 if comment.Likes > 0 {
                     comment.Likes--
                 }
+                // Decrease author reputation
+                commentAuthor.Reputation--
             } else if oldReactionType == "dislike" {
                 if comment.Dislikes > 0 {
                     comment.Dislikes--
                 }
+                // Increase author reputation (removing a dislike)
+                commentAuthor.Reputation++
             }
             
             // User has no reaction after removal
@@ -1959,6 +1972,9 @@ func React(c *fiber.Ctx) error {
                     comment.Likes--
                 }
                 comment.Dislikes++
+
+                // Update reputation: -1 for removing like, -1 for adding dislike
+                commentAuthor.Reputation -= 2
                 
                 // Set new reaction state
                 isLiked = false
@@ -1969,6 +1985,9 @@ func React(c *fiber.Ctx) error {
                     comment.Dislikes--
                 }
                 comment.Likes++
+
+                // Update reputation: +1 for removing dislike, +1 for adding like
+                commentAuthor.Reputation += 2
                 
                 // Set new reaction state
                 isLiked = true
@@ -1993,10 +2012,12 @@ func React(c *fiber.Ctx) error {
         // Increment the appropriate count
         if reactionRequest.Reaction == "like" {
             comment.Likes++
+            commentAuthor.Reputation++
             isLiked = true
             isDisliked = false
         } else if reactionRequest.Reaction == "dislike" {
             comment.Dislikes++
+            commentAuthor.Reputation--
             isLiked = false
             isDisliked = true
         }
@@ -2013,6 +2034,14 @@ func React(c *fiber.Ctx) error {
         tx.Rollback()
         return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
             "error": "Failed to update comment counts",
+        })
+    }
+
+    // Save the updated author with new reputation
+    if err := tx.Save(&commentAuthor).Error; err != nil {
+        tx.Rollback()
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to update author reputation",
         })
     }
     
@@ -2066,6 +2095,19 @@ func ToggleMarkCommentAsSolution(c *fiber.Ctx) error {
         })
     }
 
+    // Check if the post exists
+    var post models.Post
+    if err := database.DB.First(&post, comment.PostID).Error; err != nil {
+        if err == gorm.ErrRecordNotFound {
+            return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+                "error": "Post not found",
+            })
+        }
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to fetch post",
+        })
+    }
+
     // Get comment author
     var commentAuthor models.User
     if err := database.DB.First(&commentAuthor, comment.UserID).Error; err != nil {
@@ -2084,7 +2126,7 @@ func ToggleMarkCommentAsSolution(c *fiber.Ctx) error {
     }
 
     // Only the author of the post can mark a comment as a solution
-    if comment.UserID != user.ID && user.Role != "admin" && user.Role != "moderator" {
+    if post.UserID != user.ID && user.Role != "admin" && user.Role != "moderator" {
         return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
             "error": "You are not authorized to mark this comment as a solution",
         })
@@ -2102,10 +2144,14 @@ func ToggleMarkCommentAsSolution(c *fiber.Ctx) error {
                 })
             }
             // Decrease the solution count
-            if user.NumberOfSolutions > 0 {
-                user.NumberOfSolutions--
+            if commentAuthor.NumberOfSolutions > 0 {
+                commentAuthor.NumberOfSolutions--
             }
-            if err := database.DB.Save(&user).Error; err != nil {
+            // Decrease reputation points
+            if commentAuthor.Reputation > 0 {
+                commentAuthor.Reputation -= 10
+            }
+            if err := database.DB.Save(&commentAuthor).Error; err != nil {
                 return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
                     "error": "Failed to update user solution count",
                 })
@@ -2124,8 +2170,10 @@ func ToggleMarkCommentAsSolution(c *fiber.Ctx) error {
         })
     }
     // Increase the solution count
-    user.NumberOfSolutions++
-    if err := database.DB.Save(&user).Error; err != nil {
+    commentAuthor.NumberOfSolutions++
+    // Increase reputation points
+    commentAuthor.Reputation += 10
+    if err := database.DB.Save(&commentAuthor).Error; err != nil {
         return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
             "error": "Failed to update user solution count",
         })
